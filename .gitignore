@@ -30,3 +30,7 @@ dist-isolation
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase CLI temporary files
+supabase/.temp/
+
