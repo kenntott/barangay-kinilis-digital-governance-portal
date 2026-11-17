@@ -1,0 +1,160 @@
+-- =========================================================================
+-- BARANGAY KINILIS DIGITAL GOVERNANCE PORTAL
+-- REVIEW REVISION 1: COMPREHENSIVE DATA & SECURITY VERIFICATION SUITE
+-- File: supabase/review/05_data_verification.sql
+-- Validates:
+-- 1. All 13 Table Record Counts
+-- 2. Foreign Key & Orphan Absence
+-- 3. Exact Status Preservation against MySQL
+-- 4. Duplicate Reference Numbers & Records
+-- 5. Missing / Unmapped Users
+-- 6. Routing Rule Auto-Increment Sequence State
+-- 7. RLS Enabled Status on All 13 Tables
+-- 8. Storage Bucket Privacy & Policy Configuration
+-- 9. Compatibility View Security Invoker Status
+-- =========================================================================
+
+-- -------------------------------------------------------------------------
+-- 1. RECORD COUNT RECONCILIATION ACROSS ALL 13 TABLES
+-- -------------------------------------------------------------------------
+SELECT 'profiles' AS table_name, count(*) AS live_count, 5 AS expected_count, 
+       CASE WHEN count(*) = 5 THEN 'PASS' ELSE 'FAIL' END AS status FROM public.profiles
+UNION ALL SELECT 'departments', count(*), 6, CASE WHEN count(*) = 6 THEN 'PASS' ELSE 'FAIL' END FROM public.departments
+UNION ALL SELECT 'complaint_routing_rules', count(*), 6, CASE WHEN count(*) = 6 THEN 'PASS' ELSE 'FAIL' END FROM public.complaint_routing_rules
+UNION ALL SELECT 'complaints', count(*), 9, CASE WHEN count(*) = 9 THEN 'PASS' ELSE 'FAIL' END FROM public.complaints
+UNION ALL SELECT 'complaint_status_history', count(*), 19, CASE WHEN count(*) = 19 THEN 'PASS' ELSE 'FAIL' END FROM public.complaint_status_history
+UNION ALL SELECT 'complaint_assignments', count(*), 8, CASE WHEN count(*) = 8 THEN 'PASS' ELSE 'FAIL' END FROM public.complaint_assignments
+UNION ALL SELECT 'complaint_evidence', count(*), 0, CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END FROM public.complaint_evidence
+UNION ALL SELECT 'complaint_followups', count(*), 2, CASE WHEN count(*) = 2 THEN 'PASS' ELSE 'FAIL' END FROM public.complaint_followups
+UNION ALL SELECT 'complaint_resolutions', count(*), 2, CASE WHEN count(*) = 2 THEN 'PASS' ELSE 'FAIL' END FROM public.complaint_resolutions
+UNION ALL SELECT 'resident_feedback', count(*), 2, CASE WHEN count(*) = 2 THEN 'PASS' ELSE 'FAIL' END FROM public.resident_feedback
+UNION ALL SELECT 'ai_classification_logs', count(*), 4, CASE WHEN count(*) = 4 THEN 'PASS' ELSE 'FAIL' END FROM public.ai_classification_logs
+UNION ALL SELECT 'notifications', count(*), 16, CASE WHEN count(*) = 16 THEN 'PASS' ELSE 'FAIL' END FROM public.notifications
+UNION ALL SELECT 'audit_logs', count(*), 16, CASE WHEN count(*) = 16 THEN 'PASS' ELSE 'FAIL' END FROM public.audit_logs;
+
+-- -------------------------------------------------------------------------
+-- 2. FOREIGN KEY & ORPHAN INTEGRITY CHECKS (MUST ALL RETURN 0)
+-- -------------------------------------------------------------------------
+SELECT 'Orphan Complaints (invalid resident_id)' AS check_name, count(*) AS orphan_count 
+FROM public.complaints c LEFT JOIN public.profiles p ON c.resident_id = p.id WHERE c.resident_id IS NOT NULL AND p.id IS NULL
+UNION ALL SELECT 'Orphan History', count(*) FROM public.complaint_status_history h LEFT JOIN public.complaints c ON h.complaint_id = c.id WHERE c.id IS NULL
+UNION ALL SELECT 'Orphan Assignments', count(*) FROM public.complaint_assignments a LEFT JOIN public.complaints c ON a.complaint_id = c.id WHERE c.id IS NULL
+UNION ALL SELECT 'Orphan Resolutions', count(*) FROM public.complaint_resolutions r LEFT JOIN public.complaints c ON r.complaint_id = c.id WHERE c.id IS NULL
+UNION ALL SELECT 'Orphan Feedback', count(*) FROM public.resident_feedback f LEFT JOIN public.complaints c ON f.complaint_id = c.id WHERE c.id IS NULL
+UNION ALL SELECT 'Orphan Follow-ups', count(*) FROM public.complaint_followups fo LEFT JOIN public.complaints c ON fo.complaint_id = c.id WHERE c.id IS NULL
+UNION ALL SELECT 'Orphan AI Logs', count(*) FROM public.ai_classification_logs ai LEFT JOIN public.complaints c ON ai.complaint_id = c.id WHERE c.id IS NULL
+UNION ALL SELECT 'Orphan Notifications', count(*) FROM public.notifications n LEFT JOIN public.profiles p ON n.user_id = p.id WHERE n.user_id IS NOT NULL AND p.id IS NULL;
+
+-- -------------------------------------------------------------------------
+-- 3. STATUS PRESERVATION & DATA ACCURACY CHECK
+-- Verifies exact MySQL complaints, categories, priorities, and statuses
+-- -------------------------------------------------------------------------
+SELECT 
+    reference_no,
+    category,
+    priority,
+    status,
+    resident_name,
+    CASE 
+        WHEN reference_no = 'KIN-2026-000123' AND status = 'In Progress' AND category = 'Waste Management' THEN 'PASS'
+        WHEN reference_no = 'KIN-2026-000122' AND status = 'Assigned' AND category = 'Infrastructure' THEN 'PASS'
+        WHEN reference_no = 'KIN-2026-000121' AND status = 'Submitted' AND category = 'Peace & Order' THEN 'PASS'
+        WHEN reference_no = 'KIN-2026-000120' AND status = 'Resolved' AND category = 'Health Services' THEN 'PASS'
+        WHEN reference_no = 'KIN-2026-000118' AND status = 'In Progress' AND category = 'Infrastructure' THEN 'PASS'
+        WHEN reference_no = 'KIN-2026-000106' AND status = 'Submitted' AND category = 'Waste Management' THEN 'PASS'
+        WHEN reference_no = 'KIN-2026-000107' AND status = 'In Progress' AND category = 'Infrastructure' THEN 'PASS'
+        WHEN reference_no = 'KIN-2026-000108' AND status = 'Submitted' AND category = 'Waste Management' THEN 'PASS'
+        WHEN reference_no = 'KIN-2026-000109' AND status = 'Resolved' AND category = 'Infrastructure' THEN 'PASS'
+        ELSE 'FAIL_STATUS_MISMATCH'
+    END AS status_verification
+FROM public.complaints
+ORDER BY reference_no DESC;
+
+-- -------------------------------------------------------------------------
+-- 4. DUPLICATE RECORD CHECKS (MUST RETURN 0 DUPLICATES)
+-- -------------------------------------------------------------------------
+SELECT 'Duplicate Reference Numbers' AS check_name, count(*) - count(DISTINCT reference_no) AS duplicates 
+FROM public.complaints
+UNION ALL
+SELECT 'Duplicate Profile Emails', count(*) - count(DISTINCT email) 
+FROM public.profiles
+UNION ALL
+SELECT 'Duplicate Department Names', count(*) - count(DISTINCT name) 
+FROM public.departments
+UNION ALL
+SELECT 'Duplicate Routing Categories', count(*) - count(DISTINCT category) 
+FROM public.complaint_routing_rules;
+
+-- -------------------------------------------------------------------------
+-- 5. COMPLAINT OWNERSHIP & USER MAPPING AUDIT
+-- Explicitly displays resident_id state for each complaint
+-- -------------------------------------------------------------------------
+SELECT 
+    c.reference_no,
+    c.title,
+    c.resident_name,
+    c.resident_email,
+    c.resident_id,
+    p.full_name AS mapped_profile_name,
+    CASE 
+        WHEN c.resident_id IS NULL THEN 'GUEST_SUBMISSION (Verified Intended NULL)'
+        WHEN p.id IS NOT NULL THEN 'AUTHENTICATED_OWNER (Mapped)'
+        ELSE 'INVALID_OWNER'
+    END AS ownership_state
+FROM public.complaints c
+LEFT JOIN public.profiles p ON c.resident_id = p.id
+ORDER BY c.reference_no DESC;
+
+-- -------------------------------------------------------------------------
+-- 6. ROUTING RULE SEQUENCE SYNCHRONIZATION CHECK
+-- Next value must be > 6 so new inserts will not conflict with seeded rules 1..6
+-- -------------------------------------------------------------------------
+SELECT 
+    'complaint_routing_rules_seq' AS sequence_name,
+    last_value,
+    CASE WHEN last_value >= 6 THEN 'PASS (Synchronized)' ELSE 'FAIL (Sequence Lagging)' END AS sequence_status
+FROM public.complaint_routing_rules_id_seq;
+
+-- -------------------------------------------------------------------------
+-- 7. ROW LEVEL SECURITY (RLS) STATUS ACROSS ALL 13 TABLES
+-- MUST RETURN 'PASS' for all 13 application tables
+-- -------------------------------------------------------------------------
+SELECT 
+    tablename,
+    rowsecurity AS rls_enabled,
+    CASE WHEN rowsecurity = TRUE THEN 'PASS' ELSE 'FAIL_RLS_DISABLED' END AS security_status
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN (
+    'profiles', 'departments', 'complaints', 'complaint_status_history',
+    'complaint_evidence', 'complaint_assignments', 'complaint_followups',
+    'complaint_resolutions', 'resident_feedback', 'ai_classification_logs',
+    'complaint_routing_rules', 'notifications', 'audit_logs'
+  )
+ORDER BY tablename;
+
+-- -------------------------------------------------------------------------
+-- 8. STORAGE BUCKET PRIVACY CHECK
+-- Both buckets MUST be public = FALSE
+-- -------------------------------------------------------------------------
+SELECT 
+    id AS bucket_name,
+    public AS is_public,
+    CASE WHEN public = FALSE THEN 'PASS (Private)' ELSE 'FAIL (Publicly Exposed)' END AS privacy_check
+FROM storage.buckets
+WHERE id IN ('complaint-evidence', 'resolution-proofs');
+
+-- -------------------------------------------------------------------------
+-- 9. COMPATIBILITY VIEWS SECURITY INVOKER CHECK
+-- All compatibility views MUST enforce security_invoker = true
+-- -------------------------------------------------------------------------
+SELECT 
+    c.relname AS view_name,
+    CASE 
+        WHEN 'security_invoker=true' = ANY(c.reloptions) THEN 'PASS (Security Invoker Enabled)'
+        ELSE 'WARNING (May Bypass Underlying RLS)'
+    END AS security_invoker_check
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND c.relname IN ('users', 'ai_classification_results', 'complaint_routing');

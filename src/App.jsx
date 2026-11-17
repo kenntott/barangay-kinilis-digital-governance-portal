@@ -12,7 +12,6 @@ import { AuthModal } from './components/auth/AuthModal';
 import { AIReviewOverrideModal } from './components/staff/AIReviewOverrideModal';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { PWAUpdateToast } from './components/common/PWAUpdateToast';
-import { KinilisResidentAssistant } from './components/chatbot/KinilisResidentAssistant';
 
 const AppContent = () => {
   const { user, isAuthenticated } = useAuth();
@@ -135,12 +134,6 @@ const AppContent = () => {
           onClose={() => setAiReviewComplaint(null)}
         />
       )}
-
-      {/* Kinilis Smart Resident Assistant (AI-Powered Multilingual with Blaan Support) */}
-      <KinilisResidentAssistant
-        onNavigate={setActiveTab}
-        onOpenAuth={handleOpenAuth}
-      />
     </div>
   );
 };

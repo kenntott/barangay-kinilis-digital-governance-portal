@@ -8,7 +8,7 @@ import {
   FileText, Bell, AlertTriangle, HeartPulse, Trash2, 
   Wrench, CheckCircle2, ChevronRight, X, ExternalLink,
   ShieldAlert, Award, Calendar, Eye, Lock, ArrowUpRight,
-  Info, Compass, HelpCircle, PhoneCall
+  Info, Compass, HelpCircle, PhoneCall, ShieldCheck, Loader2
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from '../common/StatusBadge';
 
@@ -20,6 +20,7 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
   const [trackInput, setTrackInput] = useState('');
   const [trackResult, setTrackResult] = useState(null);
   const [searched, setSearched] = useState(false);
+  const [isTrackingLoading, setIsTrackingLoading] = useState(false);
 
   // Gallery Lightbox modal state
   const [selectedGalleryImage, setSelectedGalleryImage] = useState(null);
@@ -71,14 +72,20 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
 
   const handleSearchTrack = (e) => {
     e.preventDefault();
-    setSearched(true);
     const query = trackInput.trim().toLowerCase();
     if (!query) {
+      setSearched(true);
       setTrackResult(null);
       return;
     }
-    const found = complaints.find(c => c.referenceNo.toLowerCase() === query);
-    setTrackResult(found || null);
+    setIsTrackingLoading(true);
+    setSearched(true);
+
+    setTimeout(() => {
+      const found = complaints.find(c => c.referenceNo.toLowerCase() === query);
+      setTrackResult(found || null);
+      setIsTrackingLoading(false);
+    }, 350);
   };
 
   // Section 6: Six Public Community Services
@@ -415,45 +422,47 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
         <div className="absolute inset-0 bg-gradient-to-r from-[#052C20]/95 via-[#075B42]/85 to-[#052C20]/80 pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#052C20]/95 via-transparent to-[#052C20]/40 pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 sm:py-24 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10 flex-1">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-16 lg:py-24 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10 flex-1">
           
           {/* Hero Left Column */}
-          <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+          <div className="lg:col-span-7 space-y-4 sm:space-y-6 text-center lg:text-left">
             
             {/* Eyebrow */}
-            <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#052C20]/80 border border-[#E8B844]/40 text-[#E8B844] font-bold text-xs shadow-lg backdrop-blur-md">
-              <Sparkles className="w-4 h-4 text-[#E8B844] shrink-0" />
-              <span>OFFICIAL BARANGAY KINILIS DIGITAL GOVERNANCE PORTAL</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-[#052C20]/80 border border-[#E8B844]/40 text-[#E8B844] font-bold text-[10px] sm:text-xs shadow-lg backdrop-blur-md max-w-full">
+              <Sparkles className="w-3.5 h-3.5 text-[#E8B844] shrink-0" />
+              <span className="truncate">OFFICIAL BARANGAY KINILIS DIGITAL PORTAL</span>
             </div>
 
             {/* Main Heading & Supporting Heading */}
-            <div className="space-y-3">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-white drop-shadow-md">
+            <div className="space-y-2 sm:space-y-3">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-white drop-shadow-md">
                 KINILIS <span className="text-[#E8B844]">IBA KA</span>
               </h1>
-              <p className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-[#E8B844] leading-snug drop-shadow-sm">
+              <p className="text-base sm:text-2xl lg:text-3xl font-extrabold text-[#E8B844] leading-snug drop-shadow-sm">
                 Building a Better Community Through Responsive Public Service.
               </p>
             </div>
 
             {/* Description */}
-            <p className="text-sm sm:text-base text-slate-100 font-normal max-w-2xl leading-relaxed mx-auto lg:mx-0">
+            <p className="text-xs sm:text-base text-slate-100 font-normal max-w-2xl leading-relaxed mx-auto lg:mx-0">
               A digital platform that connects Barangay Kinilis residents with local government services, making it easier to report community concerns, track complaints, and stay informed about barangay activities.
             </p>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 pt-1 sm:pt-2 w-full">
               <button
+                type="button"
                 onClick={handleSubmitClick}
-                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#0B8F65] hover:bg-[#075B42] text-white font-extrabold text-sm shadow-xl border border-emerald-400/30 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2.5 group cursor-pointer"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 min-h-[46px] rounded-xl bg-[#0B8F65] hover:bg-[#075B42] text-white font-black text-xs sm:text-sm shadow-xl border border-emerald-400/30 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <span>Submit a Complaint</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
               
               <button
+                type="button"
                 onClick={handleTrackClick}
-                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/30 backdrop-blur-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 min-h-[46px] rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm border border-white/30 backdrop-blur-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Search className="w-4 h-4 text-[#E8B844]" />
                 <span>Track My Complaint</span>
@@ -461,17 +470,17 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
             </div>
 
             {/* Supporting Highlights */}
-            <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs text-slate-100 font-semibold border-t border-white/15">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-[#E8B844]" />
+            <div className="pt-3 sm:pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-3 sm:gap-6 text-[11px] sm:text-xs text-slate-100 font-semibold border-t border-white/15">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#E8B844] shrink-0" />
                 <span>Accessible Online Services</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-[#E8B844]" />
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#E8B844] shrink-0" />
                 <span>Transparent Complaint Tracking</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#E8B844]" />
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#E8B844] shrink-0" />
                 <span>Responsive Public Service</span>
               </div>
             </div>
@@ -479,52 +488,95 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
 
           {/* Hero Right Column: SECTION 5 QUICK COMPLAINT TRACKING CARD */}
           <div className="lg:col-span-5" id="track">
-            <div className="bg-white p-6 sm:p-8 rounded-3xl text-[#172923] shadow-2xl border border-slate-200 space-y-6 relative overflow-hidden">
+            <div className="group relative bg-white/95 backdrop-blur-md p-6 sm:p-8 rounded-[2rem] text-[#172923] shadow-[0_20px_50px_rgba(5,44,32,0.35)] hover:shadow-[0_25px_60px_rgba(7,91,66,0.45)] border-2 border-emerald-500/20 hover:border-[#E8B844]/60 transition-all duration-300 space-y-5 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
               
-              {/* Card Header with Barangay Kinilis Seal */}
-              <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
-                <div className="barangay-seal-animated w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-[#075B42] to-[#E8B844] flex items-center justify-center shrink-0 cursor-pointer">
-                  <div className="w-full h-full rounded-full bg-white p-0.5 overflow-hidden flex items-center justify-center">
-                    <img
-                      src="/images/barangay-seal.png"
-                      alt="Barangay Kinilis Seal"
-                      className="w-full h-full object-contain rounded-full"
-                      onError={(e) => { e.target.src = '/images/barangay-seal.jpg'; }}
-                    />
+              {/* Subtle Decorative Top Emerald-Gold Accent Bar */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#075B42] via-[#E8B844] to-[#0B8F65]" />
+
+              {/* Ambient Glowing Corner Orb */}
+              <div className="absolute -top-16 -right-16 w-32 h-32 bg-[#E8B844]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#E8B844]/20 transition-all duration-500" />
+
+              {/* Card Header with Animated Official Barangay Kinilis Seal */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="barangay-seal-animated w-14 h-14 sm:w-16 sm:h-16 rounded-full p-0.5 bg-gradient-to-tr from-[#075B42] via-emerald-400 to-[#E8B844] flex items-center justify-center shrink-0 cursor-pointer shadow-md">
+                    <div className="w-full h-full rounded-full bg-white p-0.5 overflow-hidden flex items-center justify-center">
+                      <img
+                        src="/images/barangay-seal.png"
+                        alt="Barangay Kinilis Seal"
+                        className="w-full h-full object-contain rounded-full"
+                        onError={(e) => { e.target.src = '/images/barangay-seal.jpg'; }}
+                      />
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <h3 className="font-black text-[#075B42] text-[10px] sm:text-xs uppercase tracking-wider truncate">
+                        BARANGAY KINILIS PORTAL
+                      </h3>
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight tracking-tight">
+                      Track Your Complaint
+                    </h2>
                   </div>
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-[#075B42] text-xs uppercase tracking-wider">Barangay Kinilis Portal</h3>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">Track Your Complaint</h2>
+
+                {/* Subtle Tracking Badge Visual Accent */}
+                <div className="hidden sm:flex w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200/80 items-center justify-center text-[#075B42] shrink-0 shadow-xs">
+                  <Search className="w-5 h-5 text-[#075B42]" />
                 </div>
               </div>
 
-              {/* Instructions */}
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Enter your official complaint reference number to check its latest status.
-              </p>
+              {/* Description Section with Icon */}
+              <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-emerald-50/60 border border-emerald-100/80">
+                <Info className="w-4 h-4 text-[#075B42] shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                  Enter your official complaint reference number to check its latest status.
+                </p>
+              </div>
 
               {/* Reference Number Form */}
-              <form onSubmit={handleSearchTrack} className="space-y-3">
-                <div className="space-y-1">
-                  <label htmlFor="ref-input" className="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
+              <form onSubmit={handleSearchTrack} className="space-y-3.5">
+                <div className="space-y-1.5">
+                  <label htmlFor="ref-input" className="block text-[11px] font-black text-slate-700 uppercase tracking-wider">
                     Complaint Reference Number
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="ref-input"
-                      type="text"
-                      value={trackInput}
-                      onChange={(e) => setTrackInput(e.target.value)}
-                      placeholder="e.g. KIN-2026-000123"
-                      className="flex-1 px-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#075B42] uppercase bg-slate-50 text-slate-900 shadow-inner"
-                    />
+                  
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    {/* Modern Input Field with Search Icon */}
+                    <div className="relative flex-1">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <FileText className="w-4 h-4 text-[#075B42]" />
+                      </div>
+                      <input
+                        id="ref-input"
+                        type="text"
+                        value={trackInput}
+                        onChange={(e) => setTrackInput(e.target.value)}
+                        placeholder="E.G. KIN-2026-000123"
+                        disabled={isTrackingLoading}
+                        className="w-full pl-10 pr-4 py-3.5 rounded-2xl border-2 border-slate-200 text-xs font-bold focus:outline-none focus:border-[#075B42] focus:ring-4 focus:ring-[#075B42]/15 uppercase bg-slate-50/80 hover:bg-white focus:bg-white text-slate-900 shadow-inner transition-all duration-200 placeholder:text-slate-400 placeholder:normal-case disabled:opacity-60"
+                      />
+                    </div>
+
+                    {/* Premium Government-Green Track Button */}
                     <button
                       type="submit"
-                      className="px-5 py-3 rounded-xl bg-[#075B42] hover:bg-[#0B8F65] text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                      disabled={isTrackingLoading}
+                      className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-[#075B42] via-[#097354] to-[#075B42] hover:from-[#0B8F65] hover:to-[#075B42] text-white font-black text-xs shadow-lg shadow-[#075B42]/30 hover:shadow-xl hover:shadow-[#075B42]/40 border border-[#E8B844]/50 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 cursor-pointer shrink-0 disabled:opacity-75 disabled:pointer-events-none"
                     >
-                      <Search className="w-4 h-4 text-[#E8B844]" />
-                      <span>Track</span>
+                      {isTrackingLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 text-[#E8B844] animate-spin" />
+                          <span>Searching...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Search className="w-4 h-4 text-[#E8B844]" />
+                          <span>Track</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -532,44 +584,64 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
 
               {/* Real-time Tracking Result Box */}
               {searched && (
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2.5 animate-in fade-in duration-200">
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-emerald-50/40 border border-emerald-200/80 text-xs space-y-3 animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
                   {trackResult ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-2">
-                        <span className="font-black text-[#075B42]">{trackResult.referenceNo}</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2 border-b border-emerald-100 pb-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="font-black text-sm text-[#075B42]">{trackResult.referenceNo}</span>
+                        </div>
                         <StatusBadge status={trackResult.status} />
                       </div>
-                      <p className="font-bold text-slate-900 leading-snug">{trackResult.title}</p>
+
+                      <p className="font-extrabold text-slate-900 leading-snug text-xs sm:text-sm">
+                        {trackResult.title}
+                      </p>
+
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1">
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Department</span>
-                          <span className="font-semibold text-slate-800">{trackResult.routing?.department || trackResult.department || 'Unassigned'}</span>
+                        <div className="p-2.5 rounded-xl bg-white border border-slate-100 shadow-xs">
+                          <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Department</span>
+                          <span className="font-bold text-slate-800 truncate block mt-0.5">{trackResult.routing?.department || trackResult.department || 'Unassigned'}</span>
                         </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Submitted Date</span>
-                          <span className="font-semibold text-slate-800">{trackResult.incidentDate || 'Recent'}</span>
+                        <div className="p-2.5 rounded-xl bg-white border border-slate-100 shadow-xs">
+                          <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Submitted Date</span>
+                          <span className="font-bold text-slate-800 truncate block mt-0.5">{trackResult.incidentDate || 'Recent'}</span>
                         </div>
                       </div>
+
                       {trackResult.timeline && trackResult.timeline.length > 0 && (
-                        <div className="pt-2 border-t border-slate-200 text-[11px]">
-                          <span className="text-slate-500 font-medium">Latest Stage: </span>
-                          <span className="font-bold text-[#075B42]">{trackResult.timeline[trackResult.timeline.length - 1].status}</span>
+                        <div className="pt-2 border-t border-emerald-100/80 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">Latest Stage:</span>
+                          <span className="font-black text-[#075B42] bg-emerald-100/80 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                            {trackResult.timeline[trackResult.timeline.length - 1].status}
+                          </span>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-center py-2 space-y-1">
-                      <p className="text-rose-600 font-bold">No complaint found for "{trackInput}"</p>
-                      <p className="text-slate-500 text-[11px]">Please verify your reference number. Example: <code className="bg-slate-200 px-1 py-0.5 rounded font-mono text-[10px]">KIN-2026-000123</code></p>
+                    <div className="text-center py-2 space-y-1.5">
+                      <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                      <p className="text-rose-600 font-black text-xs">No complaint found for "{trackInput}"</p>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        Please verify your reference number. Example: <code className="bg-slate-200/80 px-1.5 py-0.5 rounded font-mono text-[10px] font-bold">KIN-2026-000123</code>
+                      </p>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Privacy and Security Note */}
-              <div className="pt-2 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500">
-                <Lock className="w-3.5 h-3.5 text-[#075B42] shrink-0" />
-                <span>Your information is safe and secure.</span>
+              {/* Security Information Section */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#075B42] shrink-0" />
+                  <span>Your information is safe and secure.</span>
+                </div>
+                <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider hidden sm:inline-block">
+                  256-Bit SSL Encrypted
+                </span>
               </div>
             </div>
           </div>

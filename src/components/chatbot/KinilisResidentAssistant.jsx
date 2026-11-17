@@ -190,85 +190,29 @@ export const KinilisResidentAssistant = ({ onNavigate, onOpenAuth }) => {
   return (
     <>
       {/* ========================================================================= */}
-      {/* 1. FLOATING LAUNCHER BUTTON & WELCOME TEASER (Bottom-Right)                */}
+      {/* 1. FLOATING LAUNCHER BUTTON (Bottom-Right, Compact Circular Icon-Only)      */}
       {/* ========================================================================= */}
-      <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3 select-none pointer-events-auto">
-        
-        {/* Welcome Teaser Bubble (for first-time / idle visitors) */}
-        {showWelcomeTeaser && !isOpen && (
-          <div 
-            onClick={() => setIsOpen(true)}
-            className="hidden sm:flex items-center gap-3 p-3.5 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border-2 border-[#075B42]/40 text-slate-800 max-w-xs animate-in slide-in-from-bottom duration-300 cursor-pointer hover:shadow-2xl transition-all group"
-          >
-            <div className="w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-[#075B42] via-emerald-400 to-[#E8B844] shrink-0 flex items-center justify-center shadow-xs">
-              <div className="w-full h-full rounded-full bg-white p-0.5 flex items-center justify-center overflow-hidden">
-                <img 
-                  src="/images/barangay-seal.png" 
-                  alt="Kinilis Official Seal" 
-                  className="w-full h-full object-contain"
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-extrabold text-xs text-[#075B42] flex items-center gap-1">
-                <span>Kinilis Resident Assistant</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              </p>
-              <p className="text-[11px] text-slate-600 truncate mt-0.5 font-medium">
-                Fye doh! Kailangan mo ng tulong? Chat with me!
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowWelcomeTeaser(false);
-              }}
-              className="text-slate-400 hover:text-slate-700 p-1 rounded-md"
-              aria-label="Dismiss teaser"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* The Floating Launcher Button */}
-        {!isOpen && (
+      {!isOpen && (
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 select-none pointer-events-auto">
           <button
             type="button"
             onClick={() => setIsOpen(true)}
-            className="group relative flex items-center gap-2.5 px-4 py-3.5 sm:px-5 sm:py-4 rounded-full bg-gradient-to-r from-[#043D2E] via-[#075B42] to-[#043D2E] text-white shadow-2xl hover:shadow-[0_8px_30px_rgba(7,91,66,0.5)] border-2 border-[#E8B844] transition-all duration-300 hover:scale-105 active:scale-95 touch-manipulation cursor-pointer"
+            className="group relative flex items-center justify-center w-13 h-13 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-[#043D2E] via-[#075B42] to-[#0D7A59] text-white shadow-[0_8px_25px_rgba(4,61,46,0.5)] hover:shadow-[0_12px_32px_rgba(7,91,66,0.65)] border-2 border-[#E8B844] transition-all duration-300 hover:scale-110 active:scale-95 touch-manipulation cursor-pointer focus:outline-none focus:ring-4 focus:ring-[#E8B844]/50"
             aria-label="Open Kinilis Resident Assistant"
+            title="Open Kinilis Resident Assistant"
           >
-            {/* Animated Pulse Ring */}
-            <span className="absolute -inset-1 rounded-full bg-emerald-400/30 animate-ping pointer-events-none" />
+            {/* Subtle Animated Pulse Ping Ring on Hover/Idle */}
+            <span className="absolute -inset-1 rounded-full bg-emerald-400/25 group-hover:bg-[#E8B844]/35 animate-ping pointer-events-none" />
 
-            {/* Official Circular Seal Icon */}
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white p-0.5 shrink-0 overflow-hidden flex items-center justify-center border border-[#E8B844]">
-              <img 
-                src="/images/barangay-seal.png" 
-                alt="Kinilis Seal" 
-                className="w-full h-full object-contain"
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
+            {/* Centered Assistant Bot Icon with Gold Accent */}
+            <div className="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+              <Bot className="w-6 h-6 sm:w-8 sm:h-8 text-[#E8B844] drop-shadow-sm" />
+              {/* Active Online Indicator Dot */}
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-400 border-2 border-[#043D2E] shadow-xs" />
             </div>
-
-            <div className="text-left hidden xs:block sm:block pr-1">
-              <p className="font-black text-xs tracking-tight text-white leading-tight">
-                Kinilis Resident Assistant
-              </p>
-              <p className="text-[10px] text-emerald-200 font-bold uppercase tracking-wider flex items-center gap-1">
-                <span>AI Guide</span>
-                <span>•</span>
-                <span className="text-[#E8B844]">B'laan Support</span>
-              </p>
-            </div>
-
-            <Bot className="w-5 h-5 text-[#E8B844] shrink-0" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 2. CHATBOT WINDOW (Desktop Floating Panel / Mobile Adaptive Modal)          */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Navbar } from '../../../components/common/Navbar';
 import { Sidebar } from '../../../components/common/Sidebar';
+import { PortalSubheader } from '../../../components/common/PortalSubheader';
 
 export const AdminLayout = ({ children, activeTab, setActiveTab, onOpenAuth }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,10 +25,16 @@ export const AdminLayout = ({ children, activeTab, setActiveTab, onOpenAuth }) =
           onClose={() => setSidebarOpen(false)}
         />
 
-        {/* Main Viewport */}
-        <main className="flex-1 overflow-y-auto overscroll-contain p-4 md:p-6 lg:p-8 min-w-0 relative">
-          {children}
-        </main>
+        {/* Content Column with Aligned Subheader & Viewport */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Official Government Portal Subheader */}
+          <PortalSubheader activeTab={activeTab} />
+
+          {/* Main Viewport */}
+          <main className="flex-1 overflow-y-auto overscroll-contain p-4 md:p-6 lg:p-8 min-w-0 relative">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );
