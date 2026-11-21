@@ -12,9 +12,11 @@ import { AuthModal } from './components/auth/AuthModal';
 import { AIReviewOverrideModal } from './components/staff/AIReviewOverrideModal';
 import { OfflineBanner } from './components/common/OfflineBanner';
 import { PWAUpdateToast } from './components/common/PWAUpdateToast';
+import { SystemPreloader } from './components/common/SystemPreloader';
+import { SystemStartupPreloader } from './components/common/SystemStartupPreloader';
 
 const AppContent = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, preloaderState, closePreloader } = useAuth();
   
   const [activeTab, setActiveTab] = useState('landing');
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -73,6 +75,7 @@ const AppContent = () => {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             onOpenAuth={handleOpenAuth}
+            selectedComplaint={selectedComplaint}
             onViewDetails={handleViewDetails}
             onOpenAIReview={handleOpenAIReview}
           />
@@ -104,6 +107,27 @@ const AppContent = () => {
 
   return (
     <div className="bg-slate-50 text-slate-800 selection:bg-emerald-600 selection:text-white min-h-screen">
+      {/* Correct Animation Assignment: Original Seal for Startup; Percentage-based for Login/Logout */}
+      {preloaderState?.active && (
+        preloaderState.mode === 'startup' ? (
+          <SystemPreloader
+            mode="startup"
+            userRole={preloaderState.userRole}
+            userName={preloaderState.userName}
+            onComplete={closePreloader}
+            minDuration={5000}
+          />
+        ) : (
+          <SystemStartupPreloader
+            mode={preloaderState.mode}
+            userRole={preloaderState.userRole}
+            userName={preloaderState.userName}
+            onComplete={closePreloader}
+            minDuration={5000}
+          />
+        )
+      )}
+
       <OfflineBanner />
       {renderRolePortal()}
 

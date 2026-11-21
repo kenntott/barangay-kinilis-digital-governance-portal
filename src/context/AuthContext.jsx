@@ -11,6 +11,7 @@ export const DEMO_USERS = {
     email: 'juan.delacruz@kinilis.gov.ph',
     password: 'password123',
     role: 'resident',
+    status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     contact: '0917-123-4567',
     purok: 'Purok 3, Brgy. Kinilis, Polomolok'
@@ -21,6 +22,7 @@ export const DEMO_USERS = {
     email: 'maria.santos@kinilis.gov.ph',
     password: 'password123',
     role: 'staff',
+    status: 'Active',
     department: 'Sanitation Department',
     position: 'Sanitation Officer',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
@@ -32,6 +34,7 @@ export const DEMO_USERS = {
     email: 'admin@kinilis.gov.ph',
     password: 'password123',
     role: 'admin',
+    status: 'Active',
     department: 'Barangay Administrative Office',
     position: 'Barangay Administrator',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
@@ -49,6 +52,31 @@ export const AuthProvider = ({ children }) => {
     return localStorage.getItem('kinilis_is_authenticated') === 'true';
   });
 
+  const [preloaderState, setPreloaderState] = useState({
+    active: true, // Startup preloader active on first mount
+    mode: 'startup',
+    userRole: null,
+    userName: null,
+    onComplete: null
+  });
+
+  const triggerPreloader = (mode, userRole = null, userName = null, onComplete = null) => {
+    setPreloaderState({
+      active: true,
+      mode,
+      userRole,
+      userName,
+      onComplete
+    });
+  };
+
+  const closePreloader = () => {
+    setPreloaderState(prev => {
+      if (prev.onComplete) prev.onComplete();
+      return { ...prev, active: false, onComplete: null };
+    });
+  };
+
   // Keep localStorage synced for smooth session state
   useEffect(() => {
     if (user && isAuthenticated) {
@@ -59,6 +87,24 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('kinilis_is_authenticated', 'false');
     }
   }, [user, isAuthenticated]);
+
+  // Proactively verify account active status for Supabase sessions
+  useEffect(() => {
+    if (user?.id && isAuthenticated && isSupabaseConfigured() && !user.id.startsWith('usr_') && !['1', '2', '3'].includes(String(user.id))) {
+      supabase
+        .from('profiles')
+        .select('status')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data: prof }) => {
+          if (!prof || !prof.status || prof.status.trim().toLowerCase() !== 'active') {
+            console.warn('[Auth Notice]: User account profile is missing or no longer active. Terminating session.');
+            logout();
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user?.id, isAuthenticated]);
 
   const switchRole = async (roleKey) => {
     try {
@@ -118,13 +164,24 @@ export const AuthProvider = ({ children }) => {
             .from('profiles')
             .select('*')
             .eq('id', authUser.id)
-            .single();
+            .maybeSingle();
+
+          // Reject missing, inactive, or suspended accounts immediately
+          if (!profile || !profile.status || profile.status.trim().toLowerCase() !== 'active') {
+            await supabase.auth.signOut();
+            return {
+              success: false,
+              error: 'Your account profile is missing, deactivated, or suspended. Please contact the Barangay Administrator.'
+            };
+          }
 
           const loggedUser = {
             id: authUser.id,
             name: profile?.full_name || authUser.user_metadata?.full_name || email.split('@')[0],
             email: authUser.email,
             role: profile?.role || 'resident',
+            status: profile?.status || 'Active',
+            department: profile?.department || null,
             contact: profile?.phone || '',
             purok: profile?.purok || 'Brgy. Kinilis, Polomolok',
             avatar: profile?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
@@ -192,7 +249,12 @@ export const AuthProvider = ({ children }) => {
     return { success: true, user: localUser };
   };
 
-  const logout = async () => {
+  const logout = async (onAfterLogout = null) => {
+    // Show 3D seal logout animation
+    triggerPreloader('logout', user?.role, user?.name, () => {
+      if (onAfterLogout) onAfterLogout();
+    });
+
     if (isSupabaseConfigured()) {
       try {
         await supabase.auth.signOut();
@@ -208,7 +270,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, switchRole, login, logout, register }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated, 
+      switchRole, 
+      login, 
+      logout, 
+      register,
+      preloaderState,
+      triggerPreloader,
+      closePreloader
+    }}>
       {children}
     </AuthContext.Provider>
   );

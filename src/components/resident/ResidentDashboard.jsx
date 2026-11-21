@@ -16,10 +16,20 @@ export const ResidentDashboard = ({ onNavigate, onViewDetails }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
 
-  // Filter complaints relevant to current resident
-  const userComplaints = complaints.filter(c => 
-    c.residentEmail === user?.email || c.residentName === user?.name || true
-  );
+  // Filter complaints strictly belonging to the authenticated resident
+  // Enforces user.id (auth.uid) as primary authoritative ownership identifier
+  const userComplaints = complaints.filter(c => {
+    if (!user || !user.id) return false;
+    const complaintOwnerId = c.residentId || c.resident_id;
+    if (complaintOwnerId) {
+      return String(complaintOwnerId) === String(user.id);
+    }
+    // Backward compatibility for pre-migration records without assigned resident_id
+    if (user.email && c.residentEmail) {
+      return c.residentEmail.trim().toLowerCase() === user.email.trim().toLowerCase();
+    }
+    return false;
+  });
 
   const total = userComplaints.length;
   const pending = userComplaints.filter(c => c.status === 'Pending').length;

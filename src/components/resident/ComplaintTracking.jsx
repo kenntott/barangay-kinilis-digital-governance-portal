@@ -8,6 +8,8 @@ import {
   AlertCircle, ThumbsUp, RotateCcw, Upload, FileText
 } from 'lucide-react';
 import apiClient from '../../services/api/apiClient';
+import { fetchComplaintFollowupsFromSupabase, getFollowupAttachmentUrl } from '../../lib/supabaseService';
+import { isSupabaseConfigured } from '../../lib/supabase';
 
 export const ComplaintTracking = ({ complaint, onBack }) => {
   const { user } = useAuth();
@@ -19,22 +21,38 @@ export const ComplaintTracking = ({ complaint, onBack }) => {
   const [actionChoice, setActionChoice] = useState('Accepted'); // 'Accepted' or 'Request Further Action'
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [feedbackError, setFeedbackError] = useState('');
 
   // Follow-up conversation state (Feature 7)
   const [followups, setFollowups] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [followupFile, setFollowupFile] = useState(null);
   const [isSendingFollowup, setIsSendingFollowup] = useState(false);
+  const [followupError, setFollowupError] = useState('');
 
-  // Fetch followups for this complaint
+  // Fetch followups for this complaint directly from Supabase
   useEffect(() => {
+    let isMounted = true;
     if (complaint?.id) {
-      apiClient.get('followups.php', { complaint_id: complaint.id })
-        .then(data => {
-          if (Array.isArray(data)) setFollowups(data);
-        })
-        .catch(() => {});
+      if (isSupabaseConfigured()) {
+        fetchComplaintFollowupsFromSupabase(complaint.id)
+          .then(data => {
+            if (isMounted && Array.isArray(data)) setFollowups(data);
+          })
+          .catch(err => {
+            console.warn('[ComplaintTracking] Failed to fetch followups from Supabase:', err);
+          });
+      } else {
+        apiClient.get('followups.php', { complaint_id: complaint.id })
+          .then(data => {
+            if (isMounted && Array.isArray(data)) setFollowups(data);
+          })
+          .catch(() => {});
+      }
     }
+    return () => {
+      isMounted = false;
+    };
   }, [complaint?.id]);
 
   if (!complaint) return null;
@@ -72,6 +90,7 @@ export const ComplaintTracking = ({ complaint, onBack }) => {
   // Handle resident resolution verification (Feature 8)
   const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
+    setFeedbackError('');
     setIsSubmittingFeedback(true);
     try {
       await submitResidentFeedback(
@@ -85,6 +104,7 @@ export const ComplaintTracking = ({ complaint, onBack }) => {
       setFeedbackSubmitted(true);
     } catch (err) {
       console.error('Feedback submission failed:', err);
+      setFeedbackError(err.message || 'Failed to submit feedback. Please try again.');
     } finally {
       setIsSubmittingFeedback(false);
     }
@@ -95,6 +115,7 @@ export const ComplaintTracking = ({ complaint, onBack }) => {
     e.preventDefault();
     if (!newMessage.trim() && !followupFile) return;
 
+    setFollowupError('');
     setIsSendingFollowup(true);
     try {
       await sendFollowup(
@@ -121,6 +142,7 @@ export const ComplaintTracking = ({ complaint, onBack }) => {
       setFollowupFile(null);
     } catch (err) {
       console.error('Failed to send follow-up message:', err);
+      setFollowupError(err.message || 'Failed to send message. Please try again.');
     } finally {
       setIsSendingFollowup(false);
     }
@@ -339,9 +361,9 @@ export const ComplaintTracking = ({ complaint, onBack }) => {
                   <span className="text-[10px] text-slate-400 font-normal">{msg.date}</span>
                 </div>
                 <p className="text-slate-700 leading-relaxed">{msg.message}</p>
-                {msg.attachmentPath && (
+                {(msg.attachmentUrl || msg.attachmentPath) && (
                   <a 
-                    href={msg.attachmentPath} 
+                    href={msg.attachmentUrl || msg.attachmentPath} 
                     target="_blank" 
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 mt-2 text-emerald-700 font-bold text-[11px] underline"
@@ -357,6 +379,13 @@ export const ComplaintTracking = ({ complaint, onBack }) => {
             </p>
           )}
         </div>
+
+        {followupError && (
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{followupError}</span>
+          </div>
+        )}
 
         {/* Input Form */}
         <form onSubmit={handleSendFollowup} className="pt-2 border-t border-slate-100 space-y-3">
@@ -450,6 +479,13 @@ export const ComplaintTracking = ({ complaint, onBack }) => {
               <h3 className="font-extrabold text-sm text-slate-900">
                 Resident Verification: Do you accept this resolution?
               </h3>
+
+              {feedbackError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{feedbackError}</span>
+                </div>
+              )}
 
               {/* Two Option Radios */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

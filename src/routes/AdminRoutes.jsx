@@ -12,11 +12,14 @@ import { AdminNotifications } from '../pages/admin/notifications/AdminNotificati
 import { AdminProfile } from '../pages/admin/profile/AdminProfile';
 import { AdminSettings } from '../pages/admin/settings/AdminSettings';
 import { ChatbotManagement } from '../pages/admin/chatbot/ChatbotManagement';
+import { FeedbackManagementPage } from '../pages/admin/feedback/FeedbackManagementPage';
+import { StaffComplaintDetails } from '../components/staff/StaffComplaintDetails';
 
 export const AdminRoutes = ({
   activeTab,
   setActiveTab,
   onOpenAuth,
+  selectedComplaint,
   onViewDetails,
   onOpenAIReview
 }) => {
@@ -30,6 +33,8 @@ export const AdminRoutes = ({
         return <AIRoutingCenter />;
       case 'chatbot-management':
         return <ChatbotManagement />;
+      case 'feedback':
+        return <FeedbackManagementPage onViewDetails={onViewDetails} />;
       case 'departments':
         return <DepartmentDirectory />;
       case 'staff-management':
@@ -40,6 +45,15 @@ export const AdminRoutes = ({
         return <AuditTrail />;
       case 'notifications':
         return <AdminNotifications onNavigate={(tab) => setActiveTab(tab)} />;
+      case 'staff-details':
+      case 'complaint-details':
+        return (
+          <StaffComplaintDetails
+            complaint={selectedComplaint}
+            onBack={() => setActiveTab('complaint-management')}
+            onOpenAIReview={onOpenAIReview}
+          />
+        );
       case 'profile':
         return <AdminProfile />;
       case 'settings':

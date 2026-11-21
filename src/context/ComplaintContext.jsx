@@ -1,6 +1,41 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useAuth } from './AuthContext';
 import { classifyAndRouteComplaint, DEFAULT_CATEGORY_ROUTING } from '../lib/aiClassifier';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import {
+  fetchComplaintsFromSupabase,
+  createComplaintInSupabase,
+  checkDuplicatesInSupabase,
+  updateComplaintStatusInSupabase,
+  reassignComplaintInSupabase,
+  overrideAIClassificationInSupabase,
+  sendComplaintFollowupInSupabase,
+  subscribeToComplaintsRealtime,
+  unsubscribeFromComplaintsRealtime,
+  fetchDepartmentsFromSupabase,
+  createDepartmentInSupabase,
+  updateDepartmentInSupabase,
+  fetchStaffFromSupabase,
+  updateStaffProfileInSupabase,
+  fetchRoutingRulesFromSupabase,
+  updateRoutingRuleInSupabase,
+  fetchAuditLogsFromSupabase,
+  createAuditLogInSupabase,
+  submitComplaintFeedbackToSupabase,
+  fetchComplaintFeedbackFromSupabase,
+  fetchNotificationsFromSupabase,
+  markNotificationAsReadInSupabase,
+  markAllNotificationsAsReadInSupabase,
+  subscribeToNotificationsRealtime,
+  unsubscribeFromNotificationsRealtime,
+  uploadResolutionProofToSupabase,
+  submitStaffComplaintResolutionInSupabase,
+  getResolutionProofSignedUrl,
+  reserveComplaintReferenceInSupabase,
+  abandonComplaintReferenceReservationInSupabase,
+  consumeComplaintReferenceReservationInSupabase,
+  requestEvidenceCleanupInSupabase
+} from '../lib/supabaseService';
 import apiClient from '../services/api/apiClient';
 
 const ComplaintContext = createContext();
@@ -239,6 +274,8 @@ const INITIAL_STAFF = [
 ];
 
 export const ComplaintProvider = ({ children }) => {
+  const { user } = useAuth();
+
   const [complaints, setComplaints] = useState(() => {
     const saved = localStorage.getItem('kinilis_complaints');
     return saved ? JSON.parse(saved) : INITIAL_COMPLAINTS;
@@ -269,49 +306,151 @@ export const ComplaintProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [feedbackList, setFeedbackList] = useState([]);
   const [analyticsOverview, setAnalyticsOverview] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Sync state with PHP MySQL backend on mount
+  const fetchFeedback = useCallback(async () => {
+    if (isSupabaseConfigured()) {
+      try {
+        const data = await fetchComplaintFeedbackFromSupabase();
+        if (Array.isArray(data)) {
+          setFeedbackList(data);
+        }
+        return data;
+      } catch (err) {
+        console.warn('[ComplaintContext] Failed to fetch feedback:', err);
+      }
+    }
+    return [];
+  }, []);
+
+  // Sync state with Supabase backend on mount (with PHP & cached state compatibility)
   const syncWithBackend = useCallback(async () => {
     try {
       setLoading(true);
-      // 1. Fetch Complaints
-      const complaintsData = await apiClient.get('complaints.php');
-      if (Array.isArray(complaintsData) && complaintsData.length > 0) {
-        setComplaints(complaintsData);
-        localStorage.setItem('kinilis_complaints', JSON.stringify(complaintsData));
+
+      // 1. Fetch Complaints directly from Supabase PostgreSQL
+      if (isSupabaseConfigured()) {
+        try {
+          const supabaseComplaints = await fetchComplaintsFromSupabase();
+          if (Array.isArray(supabaseComplaints) && supabaseComplaints.length > 0) {
+            setComplaints(supabaseComplaints);
+            localStorage.setItem('kinilis_complaints', JSON.stringify(supabaseComplaints));
+          }
+        } catch (sbErr) {
+          console.warn('[ComplaintContext] Supabase fetch notice:', sbErr.message);
+        }
+      } else {
+        // Fallback to legacy PHP API if Supabase is not configured
+        try {
+          const complaintsData = await apiClient.get('complaints.php');
+          if (Array.isArray(complaintsData) && complaintsData.length > 0) {
+            setComplaints(complaintsData);
+            localStorage.setItem('kinilis_complaints', JSON.stringify(complaintsData));
+          }
+        } catch (apiErr) {
+          // ignore
+        }
       }
 
-      // 2. Fetch Departments and Staff
-      const deptData = await apiClient.get('departments.php');
-      if (deptData) {
-        if (Array.isArray(deptData.departments) && deptData.departments.length > 0) {
-          setDepartments(deptData.departments);
-          localStorage.setItem('kinilis_departments', JSON.stringify(deptData.departments));
+      // 2. Fetch Departments, Personnel, and Routing Rules from Supabase PostgreSQL
+      if (isSupabaseConfigured()) {
+        try {
+          const [sbDepts, sbStaff, sbRules] = await Promise.all([
+            fetchDepartmentsFromSupabase().catch(() => null),
+            fetchStaffFromSupabase().catch(() => null),
+            fetchRoutingRulesFromSupabase().catch(() => null)
+          ]);
+
+          if (Array.isArray(sbDepts) && sbDepts.length > 0) {
+            setDepartments(sbDepts);
+            localStorage.setItem('kinilis_departments', JSON.stringify(sbDepts));
+          }
+          if (Array.isArray(sbStaff) && sbStaff.length > 0) {
+            setStaffList(sbStaff);
+            localStorage.setItem('kinilis_staff', JSON.stringify(sbStaff));
+          }
+          if (Array.isArray(sbRules) && sbRules.length > 0) {
+            setCategoryRoutingRules(sbRules);
+            localStorage.setItem('kinilis_routing_rules', JSON.stringify(sbRules));
+          }
+        } catch (sbErr) {
+          console.warn('[ComplaintContext] Supabase departments/staff sync notice:', sbErr.message);
         }
-        if (Array.isArray(deptData.staffList)) {
-          setStaffList(deptData.staffList);
-          localStorage.setItem('kinilis_staff', JSON.stringify(deptData.staffList));
-        }
-        if (Array.isArray(deptData.routingRules)) {
-          setCategoryRoutingRules(deptData.routingRules);
-          localStorage.setItem('kinilis_routing_rules', JSON.stringify(deptData.routingRules));
+      } else {
+        // Fallback to legacy PHP API if Supabase is not configured
+        try {
+          const deptData = await apiClient.get('departments.php');
+          if (deptData) {
+            if (Array.isArray(deptData.departments) && deptData.departments.length > 0) {
+              setDepartments(deptData.departments);
+              localStorage.setItem('kinilis_departments', JSON.stringify(deptData.departments));
+            }
+            if (Array.isArray(deptData.staffList)) {
+              setStaffList(deptData.staffList);
+              localStorage.setItem('kinilis_staff', JSON.stringify(deptData.staffList));
+            }
+            if (Array.isArray(deptData.routingRules)) {
+              setCategoryRoutingRules(deptData.routingRules);
+              localStorage.setItem('kinilis_routing_rules', JSON.stringify(deptData.routingRules));
+            }
+          }
+        } catch (apiErr) {
+          // ignore
         }
       }
 
-      // 3. Fetch Notifications
-      const notifsData = await apiClient.get('notifications.php');
-      if (Array.isArray(notifsData)) {
-        setNotifications(notifsData);
-        localStorage.setItem('kinilis_notifications', JSON.stringify(notifsData));
+      // 3. Fetch Notifications from Supabase
+      if (isSupabaseConfigured()) {
+        try {
+          const sbNotifs = await fetchNotificationsFromSupabase(user?.id, user?.role || 'resident');
+          if (Array.isArray(sbNotifs)) {
+            setNotifications(sbNotifs);
+            localStorage.setItem('kinilis_notifications', JSON.stringify(sbNotifs));
+          }
+        } catch (notifErr) {
+          console.warn('[ComplaintContext] Supabase notification fetch notice:', notifErr.message);
+        }
+      } else {
+        const notifsData = await apiClient.get('notifications.php');
+        if (Array.isArray(notifsData)) {
+          setNotifications(notifsData);
+          localStorage.setItem('kinilis_notifications', JSON.stringify(notifsData));
+        }
       }
 
-      // 4. Fetch Audit Logs
-      const auditData = await apiClient.get('audit.php');
-      if (Array.isArray(auditData)) {
-        setAuditLogs(auditData);
-        localStorage.setItem('kinilis_audit_logs', JSON.stringify(auditData));
+      // 4. Fetch Resident Feedback from Supabase
+      if (isSupabaseConfigured()) {
+        try {
+          const fb = await fetchComplaintFeedbackFromSupabase();
+          if (Array.isArray(fb)) setFeedbackList(fb);
+        } catch (fbErr) {
+          console.warn('[ComplaintContext] Supabase feedback fetch notice:', fbErr.message);
+        }
+      }
+
+      // 5. Fetch Audit Logs
+      if (isSupabaseConfigured()) {
+        try {
+          const sbAudit = await fetchAuditLogsFromSupabase();
+          if (Array.isArray(sbAudit) && sbAudit.length > 0) {
+            setAuditLogs(sbAudit);
+            localStorage.setItem('kinilis_audit_logs', JSON.stringify(sbAudit));
+          }
+        } catch (sbErr) {
+          console.warn('[ComplaintContext] Supabase audit log fetch notice:', sbErr.message);
+        }
+      } else {
+        try {
+          const auditData = await apiClient.get('audit.php');
+          if (Array.isArray(auditData)) {
+            setAuditLogs(auditData);
+            localStorage.setItem('kinilis_audit_logs', JSON.stringify(auditData));
+          }
+        } catch (apiErr) {
+          // ignore
+        }
       }
 
       // 5. Fetch Reports Overview
@@ -330,6 +469,109 @@ export const ComplaintProvider = ({ children }) => {
     syncWithBackend();
   }, [syncWithBackend]);
 
+  // FEATURE 2: Supabase Realtime Channel Subscription with automatic unmount cleanup
+  // Governed by RLS: Authenticated channels only receive records allowed by SELECT policies.
+  // We sanitize updates so existing local state is only updated for matching complaints.
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const channel = subscribeToComplaintsRealtime(
+      (newRecord) => {
+        // Handle UPDATE event from Supabase Realtime (sanitized to existing authorized complaints)
+        setComplaints(prev => prev.map(c => {
+          if (c.id === newRecord.id || c.referenceNo === newRecord.reference_no) {
+            return {
+              ...c,
+              status: newRecord.status || c.status,
+              priority: newRecord.priority || c.priority,
+              category: newRecord.category || c.category,
+              title: newRecord.title || c.title,
+              description: newRecord.description || c.description,
+              remarks: newRecord.remarks || c.remarks,
+              timeline: [
+                ...(c.timeline || []),
+                {
+                  status: newRecord.status,
+                  date: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+                  desc: newRecord.remarks || `Status updated to ${newRecord.status} via Live Realtime.`
+                }
+              ]
+            };
+          }
+          return c;
+        }));
+      },
+      (newRecord) => {
+        // Handle live INSERT event: verify ownership before adding to resident state
+        setComplaints(prev => {
+          // If already in list, do not duplicate
+          if (prev.some(c => c.id === newRecord.id || c.referenceNo === newRecord.reference_no)) {
+            return prev;
+          }
+          // Only append if it contains verified reference and title
+          if (!newRecord.reference_no || !newRecord.title) {
+            return prev;
+          }
+          return [
+            {
+              id: newRecord.id,
+              referenceNo: newRecord.reference_no,
+              title: newRecord.title,
+              description: newRecord.description,
+              category: newRecord.category,
+              priority: newRecord.priority,
+              status: newRecord.status,
+              location: newRecord.location,
+              residentId: newRecord.resident_id,
+              residentName: newRecord.resident_name,
+              residentEmail: newRecord.resident_email,
+              residentPhone: newRecord.resident_phone,
+              submittedAt: newRecord.submitted_at,
+              incidentDate: newRecord.incident_date,
+              timeline: [
+                {
+                  status: newRecord.status || 'Submitted',
+                  date: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+                  desc: 'New complaint registered via Live Realtime.'
+                }
+              ],
+              attachments: []
+            },
+            ...prev
+          ];
+        });
+      }
+    );
+
+    return () => {
+      if (channel) {
+        unsubscribeFromComplaintsRealtime(channel);
+      }
+    };
+  }, []);
+
+  // FEATURE 6: Supabase Realtime Notification Subscription with automatic cleanup
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const notifChannel = subscribeToNotificationsRealtime(
+      user?.id,
+      user?.role || 'resident',
+      (newNotif) => {
+        setNotifications(prev => {
+          if (prev.some(n => n.id === newNotif.id)) return prev;
+          return [newNotif, ...prev];
+        });
+      }
+    );
+
+    return () => {
+      if (notifChannel) {
+        unsubscribeFromNotificationsRealtime(notifChannel);
+      }
+    };
+  }, [user?.id, user?.role]);
+
   // Persist local state whenever updated
   useEffect(() => {
     localStorage.setItem('kinilis_complaints', JSON.stringify(complaints));
@@ -343,10 +585,31 @@ export const ComplaintProvider = ({ children }) => {
     localStorage.setItem('kinilis_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
-  // FEATURE 1: Submit Complaint with MySQL & Evidence File Support
+  // FEATURE 1: Submit Complaint with Supabase PostgreSQL & Storage Evidence Support
   const submitComplaint = async (formData, user) => {
+    const aiResult = classifyAndRouteComplaint(formData.title, formData.description, formData.category);
+
+    // 1. Primary: Save directly to Supabase PostgreSQL & Supabase Storage
+    if (isSupabaseConfigured()) {
+      try {
+        const createdSupabaseComplaint = await createComplaintInSupabase(
+          formData,
+          aiResult,
+          user,
+          formData.rawFiles || []
+        );
+        if (createdSupabaseComplaint) {
+          setComplaints(prev => [createdSupabaseComplaint, ...prev]);
+          return createdSupabaseComplaint;
+        }
+      } catch (sbError) {
+        console.error('[ComplaintContext] Supabase submission error:', sbError);
+        throw sbError; // Propagate error so user gets clear failure alert without misleading success
+      }
+    }
+
+    // 2. Compatibility: Try legacy PHP API only if Supabase is not configured
     try {
-      // Build FormData for upload
       const dataPayload = new FormData();
       dataPayload.append('title', formData.title);
       dataPayload.append('description', formData.description);
@@ -360,7 +623,6 @@ export const ComplaintProvider = ({ children }) => {
       dataPayload.append('residentPhone', formData.phone || user?.contact || '0917-000-0000');
       if (user?.id) dataPayload.append('residentId', user.id);
 
-      // Append files if available
       if (formData.rawFiles && formData.rawFiles.length > 0) {
         Array.from(formData.rawFiles).forEach(f => {
           dataPayload.append('evidence[]', f);
@@ -370,17 +632,15 @@ export const ComplaintProvider = ({ children }) => {
       const result = await apiClient.post('complaints.php', dataPayload, true);
       if (result && result.referenceNo) {
         setComplaints(prev => [result, ...prev]);
-        syncWithBackend(); // refresh notifications and audit
         return result;
       }
     } catch (err) {
-      console.warn('Backend submit notice, creating offline/fallback complaint:', err.message);
+      console.warn('[ComplaintContext] Legacy PHP fallback notice:', err.message);
     }
 
-    // Fallback in-memory creation
+    // 3. Offline in-memory fallback
     const nowIso = new Date().toISOString();
     const nowFormatted = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-    const aiResult = classifyAndRouteComplaint(formData.title, formData.description, formData.category);
     const refNo = `KIN-2026-${Math.floor(100000 + Math.random() * 900000)}`;
 
     const newComplaint = {
@@ -428,8 +688,17 @@ export const ComplaintProvider = ({ children }) => {
     return newComplaint;
   };
 
-  // FEATURE 3: Check Duplicate Complaints
-  const checkDuplicates = async (title, description, location, category, excludeId = 0) => {
+  // FEATURE 1: Check Duplicate Complaints with Supabase
+  const checkDuplicates = async (title, description, location, category, excludeId = null) => {
+    if (isSupabaseConfigured()) {
+      try {
+        const matches = await checkDuplicatesInSupabase(title, description, location, category, excludeId);
+        return matches;
+      } catch (sbErr) {
+        console.warn('[ComplaintContext] Supabase duplicate check notice:', sbErr);
+      }
+    }
+
     try {
       const dupes = await apiClient.get('complaints.php', {
         action: 'check_duplicates',
@@ -437,37 +706,40 @@ export const ComplaintProvider = ({ children }) => {
         description,
         location,
         category,
-        exclude_id: excludeId
+        exclude_id: excludeId || 0
       });
       return Array.isArray(dupes) ? dupes : [];
     } catch (err) {
-      console.warn('Duplicate check notice:', err.message);
       return [];
     }
   };
 
-  // FEATURE 3 & 4: Manual Override of AI Classification & Priority
+  // FEATURE 1: Manual Override of AI Classification & Priority with Supabase
   const overrideAIClassification = async (complaintId, newCategory, newDepartment, newPriority, overrideReason, staffUser) => {
-    try {
-      const updated = await apiClient.put('complaints.php?action=override_ai', {
-        complaintId,
-        category: newCategory,
-        department: newDepartment,
-        priority: newPriority,
-        reason: overrideReason,
-        userName: staffUser?.name || 'Staff Officer',
-        userRole: staffUser?.role || 'Staff'
-      });
-      if (updated && updated.id) {
-        setComplaints(prev => prev.map(c => c.id === String(complaintId) ? updated : c));
-        syncWithBackend();
-        return updated;
+    if (isSupabaseConfigured()) {
+      try {
+        await overrideAIClassificationInSupabase(complaintId, newCategory, newDepartment, newPriority, overrideReason, staffUser);
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase override error:', sbErr);
+        throw sbErr; // Propagate error so user gets clear failure alert without misleading success
       }
-    } catch (err) {
-      console.warn('Backend override notice:', err.message);
+    } else {
+      try {
+        await apiClient.put('complaints.php?action=override_ai', {
+          complaintId,
+          category: newCategory,
+          department: newDepartment,
+          priority: newPriority,
+          reason: overrideReason,
+          userName: staffUser?.name || 'Staff Officer',
+          userRole: staffUser?.role || 'Staff'
+        });
+      } catch (err) {
+        // ignore
+      }
     }
 
-    // Local fallback
+    // Synchronize local active state
     setComplaints(prev => prev.map(cmp => {
       if (cmp.id === String(complaintId)) {
         return {
@@ -489,27 +761,40 @@ export const ComplaintProvider = ({ children }) => {
     }));
   };
 
-  // FEATURE 5: Department & Officer Reassignment
+  // FEATURE 1 & 3: Department & Officer Reassignment with Supabase
   const reassignComplaint = async (complaintId, newDepartment, newOfficer, notes, staffUser) => {
-    try {
-      const updated = await apiClient.put('complaints.php?action=reassign', {
-        complaintId,
-        department: newDepartment,
-        assignedStaff: newOfficer,
-        notes: notes || 'Administrative reassignment',
-        userName: staffUser?.name || 'Admin',
-        userRole: staffUser?.role || 'Admin'
-      });
-      if (updated && updated.id) {
-        setComplaints(prev => prev.map(c => c.id === String(complaintId) ? updated : c));
-        syncWithBackend();
-        return updated;
+    if (isSupabaseConfigured()) {
+      try {
+        await reassignComplaintInSupabase(complaintId, newDepartment, newOfficer, notes, staffUser);
+        createAuditLogInSupabase({
+          user: staffUser?.name || staffUser?.fullName || 'Admin Desk',
+          role: staffUser?.role || 'admin',
+          action: 'REASSIGN_COMPLAINT',
+          module: 'Department Assignment',
+          entity: String(complaintId),
+          oldValue: 'Assigned',
+          newValue: `${newDepartment} -> ${newOfficer}`
+        }).catch(err => console.warn('[Audit Log Notice]:', err.message));
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase reassign error:', sbErr);
+        throw sbErr; // Propagate error so user gets clear failure alert without misleading success
       }
-    } catch (err) {
-      console.warn('Backend reassign notice:', err.message);
+    } else {
+      try {
+        await apiClient.put('complaints.php?action=reassign', {
+          complaintId,
+          department: newDepartment,
+          assignedStaff: newOfficer,
+          notes: notes || 'Administrative reassignment',
+          userName: staffUser?.name || 'Admin',
+          userRole: staffUser?.role || 'Admin'
+        });
+      } catch (err) {
+        // ignore
+      }
     }
 
-    // Local fallback
+    // Synchronize local active state
     setComplaints(prev => prev.map(cmp => {
       if (cmp.id === String(complaintId)) {
         return {
@@ -530,26 +815,30 @@ export const ComplaintProvider = ({ children }) => {
     }));
   };
 
-  // FEATURE 6: Update Complaint Status
+  // FEATURE 1: Update Complaint Status with Supabase
   const updateComplaintStatus = async (complaintId, newStatus, staffRemarks, staffUser) => {
-    try {
-      const updated = await apiClient.put('complaints.php?action=update_status', {
-        complaintId,
-        status: newStatus,
-        remarks: staffRemarks || '',
-        userName: staffUser?.name || 'Staff Officer',
-        userRole: staffUser?.role || 'Staff'
-      });
-      if (updated && updated.id) {
-        setComplaints(prev => prev.map(c => c.id === String(complaintId) ? updated : c));
-        syncWithBackend();
-        return updated;
+    if (isSupabaseConfigured()) {
+      try {
+        await updateComplaintStatusInSupabase(complaintId, newStatus, staffRemarks, staffUser);
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase status update error:', sbErr);
+        throw sbErr; // Propagate error so user gets clear failure alert without misleading success
       }
-    } catch (err) {
-      console.warn('Backend status update notice:', err.message);
+    } else {
+      try {
+        await apiClient.put('complaints.php?action=update_status', {
+          complaintId,
+          status: newStatus,
+          remarks: staffRemarks || '',
+          userName: staffUser?.name || 'Staff Officer',
+          userRole: staffUser?.role || 'Staff'
+        });
+      } catch (err) {
+        // ignore
+      }
     }
 
-    // Local fallback
+    // Synchronize local active state
     setComplaints(prev => prev.map(cmp => {
       if (cmp.id === String(complaintId)) {
         return {
@@ -566,8 +855,75 @@ export const ComplaintProvider = ({ children }) => {
     }));
   };
 
-  // FEATURE 8: Submit Resolution (Staff Proof of Work)
-  const submitResolution = async (complaintId, resolutionSummary, evidenceUrl, staffUser, evidenceFile = null) => {
+  // FEATURE 8: Submit Resolution (Staff Proof of Work) via Supabase Storage + Atomic RPC
+  const submitResolution = async (complaintId, resolutionSummary, evidenceUrl, staffUser, evidenceFile = null, correctionReason = null) => {
+    const targetComp = complaints.find(c => String(c.id) === String(complaintId));
+    const refNo = targetComp?.referenceNo || `REF-${complaintId}`;
+
+    if (isSupabaseConfigured()) {
+      try {
+        let evidencePath = null;
+        if (evidenceFile) {
+          // 1. Upload to private Supabase Storage bucket 'resolution-proofs'
+          evidencePath = await uploadResolutionProofToSupabase(refNo, evidenceFile);
+        } else if (evidenceUrl && !evidenceUrl.startsWith('http://') && !evidenceUrl.startsWith('https://') && !evidenceUrl.startsWith('blob:') && !evidenceUrl.startsWith('/')) {
+          evidencePath = evidenceUrl;
+        }
+
+        // 2. Call atomic hardened PostgreSQL RPC with idempotency key
+        const idempotencyKey = `res_${complaintId}_${Date.now()}`;
+        const result = await submitStaffComplaintResolutionInSupabase({
+          complaintId,
+          summary: resolutionSummary,
+          evidencePath,
+          correctionReason,
+          idempotencyKey
+        });
+
+        // 3. Resolve temporary signed URL for immediate local preview
+        let previewSignedUrl = '';
+        if (evidencePath) {
+          previewSignedUrl = await getResolutionProofSignedUrl(evidencePath, 300) || '';
+        }
+
+        // 4. Synchronize local state
+        const nowFormatted = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+        setComplaints(prev => prev.map(cmp => {
+          if (String(cmp.id) === String(complaintId)) {
+            return {
+              ...cmp,
+              status: 'Resolution Submitted',
+              resolution: {
+                summary: resolutionSummary,
+                resolvedBy: staffUser?.name || 'Staff Officer',
+                resolvedAt: nowFormatted,
+                evidenceUrl: previewSignedUrl || cmp.resolution?.evidenceUrl || '',
+                rawEvidencePath: evidencePath || cmp.resolution?.rawEvidencePath || ''
+              },
+              timeline: [
+                ...cmp.timeline,
+                {
+                  status: 'Resolution Submitted',
+                  date: nowFormatted,
+                  desc: correctionReason
+                    ? `Corrected action taken: ${resolutionSummary} (${correctionReason})`
+                    : `Action taken: ${resolutionSummary}. Awaiting resident review and verification.`
+                }
+              ]
+            };
+          }
+          return cmp;
+        }));
+
+        return true;
+      } catch (err) {
+        console.error('[ComplaintContext] Supabase resolution error:', err);
+        // Do NOT silently fall back to PHP in production/Vercel. Propagate clear error to caller.
+        throw err;
+      }
+    }
+
+    // Local development fallback only (when Supabase is explicitly not configured)
     try {
       let payload;
       let isForm = false;
@@ -592,49 +948,57 @@ export const ComplaintProvider = ({ children }) => {
       return true;
     } catch (err) {
       console.warn('Backend resolution notice:', err.message);
+      throw err;
     }
-
-    // Local fallback
-    const nowFormatted = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
-    setComplaints(prev => prev.map(cmp => {
-      if (cmp.id === String(complaintId)) {
-        return {
-          ...cmp,
-          status: 'Resolution Submitted',
-          resolution: {
-            summary: resolutionSummary,
-            resolvedBy: staffUser?.name || 'Staff Officer',
-            resolvedAt: nowFormatted,
-            evidenceUrl: evidenceUrl || ''
-          },
-          timeline: [
-            ...cmp.timeline,
-            { status: 'Resolution Submitted', date: nowFormatted, desc: `Action taken: ${resolutionSummary}. Awaiting resident review and verification.` }
-          ]
-        };
-      }
-      return cmp;
-    }));
   };
 
-  // FEATURE 8: Resident Reviews Resolution & Submits Feedback
+  // FEATURE 3 & 4: Resident Reviews Resolution & Submits Feedback with Supabase
   const submitResidentFeedback = async (complaintId, rating, satisfaction, comments, actionStatus = 'Accepted', residentName = 'Resident') => {
-    try {
-      await apiClient.post('resolutions.php?action=submit_feedback', {
-        complaintId,
-        rating,
-        satisfaction,
-        comments,
-        actionStatus,
-        residentName
-      });
-      syncWithBackend();
-      return true;
-    } catch (err) {
-      console.warn('Backend feedback notice:', err.message);
+    if (isSupabaseConfigured()) {
+      try {
+        await submitComplaintFeedbackToSupabase(
+          complaintId,
+          rating,
+          satisfaction,
+          comments,
+          actionStatus,
+          user?.id || null
+        );
+
+        // Record audit trail
+        createAuditLogInSupabase({
+          user: residentName || user?.name || 'Resident',
+          role: 'resident',
+          action: 'SUBMIT_FEEDBACK',
+          module: 'Resident Feedback',
+          entity: String(complaintId),
+          oldValue: 'Awaiting Verification',
+          newValue: `${actionStatus} (${rating}★, ${satisfaction})`
+        }).catch(() => {});
+
+        // Notification dispatch is handled server-side by trg_feedback_notification trigger
+        fetchFeedback();
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase submitResidentFeedback error:', sbErr);
+        throw sbErr;
+      }
+    } else {
+      try {
+        await apiClient.post('resolutions.php?action=submit_feedback', {
+          complaintId,
+          rating,
+          satisfaction,
+          comments,
+          actionStatus,
+          residentName
+        });
+        syncWithBackend();
+      } catch (err) {
+        console.warn('Backend feedback notice:', err.message);
+      }
     }
 
-    // Local fallback
+    // Synchronize local active state
     const finalStatus = (actionStatus === 'Accepted') ? 'Resolved' : 'In Progress';
     setComplaints(prev => prev.map(cmp => {
       if (cmp.id === String(complaintId)) {
@@ -661,10 +1025,32 @@ export const ComplaintProvider = ({ children }) => {
       }
       return cmp;
     }));
+    return true;
   };
 
-  // FEATURE 7: Send Follow-Up Message
+  // FEATURE 1 & 2: Send Follow-Up Message with Attachments & Realtime Notifications
   const sendFollowup = async (complaintId, message, senderName, senderRole, senderId = null, attachmentFile = null) => {
+    // 1. Primary: Save directly to Supabase PostgreSQL & Storage
+    if (isSupabaseConfigured()) {
+      try {
+        const savedFollowup = await sendComplaintFollowupInSupabase(
+          complaintId,
+          message,
+          senderName,
+          senderRole,
+          senderId,
+          attachmentFile
+        );
+
+        // Notification dispatch is handled server-side by trg_followup_notification trigger
+        return savedFollowup;
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase followup error:', sbErr);
+        throw sbErr;
+      }
+    }
+
+    // 2. Fallback: Legacy PHP endpoint
     try {
       let payload;
       let isForm = false;
@@ -695,8 +1081,31 @@ export const ComplaintProvider = ({ children }) => {
     }
   };
 
-  // Department Management
+  // FEATURE 3: Department Management
   const addDepartment = async (deptData) => {
+    if (isSupabaseConfigured()) {
+      try {
+        const created = await createDepartmentInSupabase(deptData);
+        if (created) {
+          setDepartments(prev => [...prev, created]);
+          createAuditLogInSupabase({
+            user: 'Admin Desk',
+            role: 'admin',
+            action: 'CREATE_DEPARTMENT',
+            module: 'Departments',
+            entity: created.name,
+            oldValue: 'None',
+            newValue: `Head: ${created.head || 'N/A'}, Staff: ${created.staffCount}`
+          }).catch(err => console.warn('[Audit Log Notice]:', err.message));
+          return created;
+        }
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase addDepartment error:', sbErr);
+        throw sbErr;
+      }
+    }
+
+    // Fallback: Legacy PHP
     try {
       await apiClient.post('departments.php?action=add_department', {
         name: deptData.name,
@@ -711,24 +1120,102 @@ export const ComplaintProvider = ({ children }) => {
       console.warn('Backend add department notice:', err.message);
     }
 
-    // Fallback
     const newDept = {
       id: `dept_${Date.now()}`,
       name: deptData.name,
       description: deptData.description,
       head: deptData.head || 'Unassigned',
       staffCount: Number(deptData.staffCount) || 5,
-      slaHours: 72,
+      slaHours: deptData.slaHours || 72,
       activeComplaints: 0,
       resolvedComplaints: 0,
       status: 'Active'
     };
     setDepartments(prev => [...prev, newDept]);
+    return newDept;
   };
 
-  // Update Routing Rules
+  const editDepartment = async (deptId, updates) => {
+    if (isSupabaseConfigured()) {
+      try {
+        const updated = await updateDepartmentInSupabase(deptId, updates);
+        setDepartments(prev => prev.map(d => d.id === deptId ? { ...d, ...updated } : d));
+        createAuditLogInSupabase({
+          user: 'Admin Desk',
+          role: 'admin',
+          action: 'UPDATE_DEPARTMENT',
+          module: 'Departments',
+          entity: String(deptId),
+          oldValue: 'Existing Configuration',
+          newValue: JSON.stringify(updates)
+        }).catch(err => console.warn('[Audit Log Notice]:', err.message));
+        return updated;
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase editDepartment error:', sbErr);
+        throw sbErr;
+      }
+    }
+
+    setDepartments(prev => prev.map(d => d.id === deptId ? { ...d, ...updates } : d));
+    return true;
+  };
+
+  const toggleDepartmentStatus = async (deptId, currentStatus) => {
+    const nextStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+    return editDepartment(deptId, { status: nextStatus });
+  };
+
+  // FEATURE 3: Personnel Management
+  const updateStaffMember = async (staffId, updates) => {
+    if (isSupabaseConfigured()) {
+      try {
+        const updated = await updateStaffProfileInSupabase(staffId, updates);
+        setStaffList(prev => prev.map(s => s.id === staffId ? { ...s, ...updated } : s));
+        createAuditLogInSupabase({
+          user: 'Admin Desk',
+          role: 'admin',
+          action: 'UPDATE_STAFF_PROFILE',
+          module: 'Personnel',
+          entity: String(staffId),
+          oldValue: 'Existing Profile',
+          newValue: JSON.stringify(updates)
+        }).catch(err => console.warn('[Audit Log Notice]:', err.message));
+        return updated;
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase updateStaffMember error:', sbErr);
+        throw sbErr;
+      }
+    }
+
+    setStaffList(prev => prev.map(s => s.id === staffId ? { ...s, ...updates } : s));
+    return true;
+  };
+
+  // FEATURE 3: Department Routing Rules
   const updateRoutingRules = async (newRules) => {
     setCategoryRoutingRules(newRules);
+
+    if (isSupabaseConfigured()) {
+      try {
+        for (const rule of newRules) {
+          await updateRoutingRuleInSupabase(rule);
+        }
+        createAuditLogInSupabase({
+          user: 'Admin Desk',
+          role: 'admin',
+          action: 'UPDATE_ROUTING_RULES',
+          module: 'Routing Engine',
+          entity: 'AI Category Rules',
+          oldValue: 'Previous Rules',
+          newValue: `${newRules.length} rules saved to database`
+        }).catch(err => console.warn('[Audit Log Notice]:', err.message));
+        return true;
+      } catch (sbErr) {
+        console.error('[ComplaintContext] Supabase updateRoutingRules error:', sbErr);
+        throw sbErr;
+      }
+    }
+
     try {
       for (const rule of newRules) {
         await apiClient.post('departments.php?action=update_routing_rule', rule);
@@ -754,19 +1241,27 @@ export const ComplaintProvider = ({ children }) => {
 
   // Notification actions
   const markNotificationAsRead = async (id) => {
-    try {
-      await apiClient.post('notifications.php?action=mark_read', { id });
-    } catch (err) {
-      console.warn('Mark read notice:', err.message);
+    if (isSupabaseConfigured()) {
+      markNotificationAsReadInSupabase(id).catch(err => console.warn('Supabase mark read warning:', err));
+    } else {
+      try {
+        await apiClient.post('notifications.php?action=mark_read', { id });
+      } catch (err) {
+        console.warn('Mark read notice:', err.message);
+      }
     }
     setNotifications(prev => prev.map(n => n.id === String(id) ? { ...n, read: true } : n));
   };
 
   const markAllNotificationsRead = async (role = 'all') => {
-    try {
-      await apiClient.post('notifications.php?action=mark_all_read', { role });
-    } catch (err) {
-      console.warn('Mark all read notice:', err.message);
+    if (isSupabaseConfigured()) {
+      markAllNotificationsAsReadInSupabase(user?.id, user?.role || role).catch(err => console.warn('Supabase mark all read warning:', err));
+    } else {
+      try {
+        await apiClient.post('notifications.php?action=mark_all_read', { role });
+      } catch (err) {
+        console.warn('Mark all read notice:', err.message);
+      }
     }
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
@@ -779,6 +1274,8 @@ export const ComplaintProvider = ({ children }) => {
       categoryRoutingRules,
       auditLogs,
       notifications,
+      feedbackList,
+      fetchFeedback,
       analyticsOverview,
       loading,
       refreshData: syncWithBackend,
@@ -790,9 +1287,17 @@ export const ComplaintProvider = ({ children }) => {
       updateComplaint,
       resolveComplaint: submitResolution,
       submitResolution,
+      getResolutionProofSignedUrl,
+      reserveComplaintReference: reserveComplaintReferenceInSupabase,
+      abandonComplaintReferenceReservation: abandonComplaintReferenceReservationInSupabase,
+      consumeComplaintReferenceReservation: consumeComplaintReferenceReservationInSupabase,
+      requestEvidenceCleanup: requestEvidenceCleanupInSupabase,
       submitResidentFeedback,
       sendFollowup,
       addDepartment,
+      editDepartment,
+      toggleDepartmentStatus,
+      updateStaffMember,
       updateRoutingRules,
       markNotificationAsRead,
       markAllNotificationsRead

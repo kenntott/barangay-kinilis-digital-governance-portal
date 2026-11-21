@@ -13,20 +13,23 @@ export const ComplaintSubmissionWizard = ({ onNavigate, onViewDetails }) => {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
   const [submittedComplaint, setSubmittedComplaint] = useState(null);
   const [duplicateCandidates, setDuplicateCandidates] = useState([]);
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [duplicateCheckError, setDuplicateCheckError] = useState('');
 
-  // Form State
+  // Form State - uses actual authenticated user profile or empty string (zero fake defaults)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: 'Waste Management',
-    location: user?.purok || 'Purok 3, Brgy. Kinilis, Polomolok',
+    location: user?.purok || '',
     incidentDate: new Date().toISOString().split('T')[0],
     incidentTime: '10:00 AM',
-    phone: user?.contact || '0917-123-4567',
-    email: user?.email || 'juan.delacruz@kinilis.gov.ph',
+    phone: user?.contact || '',
+    email: user?.email || '',
+    contactName: user?.name || '',
     preferredContact: 'Phone',
     attachments: [],
     rawFiles: []
@@ -37,11 +40,14 @@ export const ComplaintSubmissionWizard = ({ onNavigate, onViewDetails }) => {
     if (formData.title.length > 8 || formData.description.length > 15) {
       const timer = setTimeout(async () => {
         setCheckingDuplicates(true);
+        setDuplicateCheckError('');
         try {
           const dupes = await checkDuplicates(formData.title, formData.description, formData.location, formData.category);
           setDuplicateCandidates(dupes);
         } catch (e) {
-          // ignore
+          console.warn('[Duplicate Check Notice]:', e.message);
+          setDuplicateCheckError('Could not verify duplicate reports at this moment.');
+          setDuplicateCandidates([]);
         } finally {
           setCheckingDuplicates(false);
         }
@@ -49,6 +55,7 @@ export const ComplaintSubmissionWizard = ({ onNavigate, onViewDetails }) => {
       return () => clearTimeout(timer);
     } else {
       setDuplicateCandidates([]);
+      setDuplicateCheckError('');
     }
   }, [formData.title, formData.description, formData.location, formData.category]);
 
@@ -78,6 +85,34 @@ export const ComplaintSubmissionWizard = ({ onNavigate, onViewDetails }) => {
   };
 
   const handleNext = async () => {
+    setSubmissionError('');
+
+    // Step 1 Validation
+    if (currentStep === 1) {
+      if (!formData.title || formData.title.trim().length < 5) {
+        setSubmissionError('Please provide a complaint title with at least 5 characters.');
+        return;
+      }
+      if (!formData.description || formData.description.trim().length < 10) {
+        setSubmissionError('Please provide a detailed description with at least 10 characters.');
+        return;
+      }
+    }
+
+    // Step 3 Validation
+    if (currentStep === 3) {
+      const complainantName = (user?.name || formData.contactName || '').trim();
+      const complainantEmail = (user?.email || formData.email || '').trim();
+      if (!complainantName) {
+        setSubmissionError('Please provide your full name as the complainant.');
+        return;
+      }
+      if (!complainantEmail || !complainantEmail.includes('@')) {
+        setSubmissionError('Please provide a valid email address for tracking notifications.');
+        return;
+      }
+    }
+
     if (currentStep < 4) {
       setCurrentStep(prev => prev + 1);
     } else if (currentStep === 4) {
@@ -85,10 +120,15 @@ export const ComplaintSubmissionWizard = ({ onNavigate, onViewDetails }) => {
       setIsAnalyzing(true);
       try {
         const created = await submitComplaint(formData, user);
-        setSubmittedComplaint(created);
-        setCurrentStep(5);
+        if (created && created.referenceNo) {
+          setSubmittedComplaint(created);
+          setCurrentStep(5);
+        } else {
+          setSubmissionError('Could not finalize complaint submission. Please try again.');
+        }
       } catch (err) {
         console.error('Submission failed:', err);
+        setSubmissionError(err.message || 'Submission failed. Please check your network and try again.');
       } finally {
         setIsAnalyzing(false);
       }
@@ -343,9 +383,24 @@ export const ComplaintSubmissionWizard = ({ onNavigate, onViewDetails }) => {
 
               <div className="space-y-4">
                 <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Complainant Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter your full name"
+                    value={formData.contactName}
+                    onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Contact Phone Number</label>
                   <input
                     type="text"
+                    placeholder="e.g. 0917-000-0000"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
@@ -428,6 +483,16 @@ export const ComplaintSubmissionWizard = ({ onNavigate, onViewDetails }) => {
                   </div>
                 )}
               </div>
+
+              {submissionError && (
+                <div className="p-4 bg-rose-50 rounded-2xl border border-rose-300 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-rose-900 leading-relaxed font-semibold">
+                    <p className="font-bold text-rose-950">Submission Failed</p>
+                    <p>{submissionError}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 flex items-start gap-3">
                 <Sparkles className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />

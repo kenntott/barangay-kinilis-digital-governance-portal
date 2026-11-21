@@ -1,0 +1,248 @@
+/* ==========================================================================
+   BARANGAY KINILIS — MINIMAL PREMIUM PRELOADER
+   Inspired by DesinioKoleksyon Reference Layout:
+   Clean dark emerald/charcoal, centered 3D seal, single glowing ring,
+   refined typography, circular spinner, and discreet corner patterns.
+   ========================================================================== */
+
+/* Fullscreen Canvas */
+.kinilis-minimal-preloader {
+  background-color: #03140d;
+  opacity: 1;
+  transition: opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kinilis-preloader-fadeout {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Subtle Radial Backdrop */
+.kinilis-minimal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 40%, #062b1b 0%, #03170e 45%, #020c07 100%);
+  pointer-events: none;
+}
+
+/* Discreet Corner Geometric Patterns (DesinioKoleksyon Style) */
+.kinilis-corner-decor {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.28;
+  z-index: 5;
+}
+
+.kinilis-corner-tl { top: 28px; left: 28px; }
+.kinilis-corner-tr { top: 28px; right: 28px; }
+.kinilis-corner-bl { bottom: 28px; left: 28px; }
+.kinilis-corner-br { bottom: 28px; right: 28px; }
+
+@media (max-width: 640px) {
+  .kinilis-corner-tl, .kinilis-corner-tr,
+  .kinilis-corner-bl, .kinilis-corner-br {
+    opacity: 0.16;
+    transform: scale(0.75);
+  }
+}
+
+/* Dot Matrix Grid (3 cols x 4 rows) */
+.kinilis-dot-matrix {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.kinilis-grid-dot {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
+}
+
+/* Diagonal Stripe Corners */
+.kinilis-diagonal-stripes {
+  width: 44px;
+  height: 44px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(212, 175, 55, 0.65),
+    rgba(212, 175, 55, 0.65) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+}
+
+.kinilis-diagonal-stripes.flip {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(52, 211, 153, 0.6),
+    rgba(52, 211, 153, 0.6) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+}
+
+/* Centered Seal Showcase */
+.kinilis-seal-centerpiece {
+  width: 200px;
+  height: 200px;
+}
+
+@media (min-width: 640px) {
+  .kinilis-seal-centerpiece {
+    width: 240px;
+    height: 240px;
+  }
+}
+
+/* Soft Emerald Backlight immediately behind seal */
+.kinilis-seal-soft-radial {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.28) 0%, rgba(212, 175, 55, 0.1) 45%, transparent 72%);
+  filter: blur(24px);
+  animation: kinilis-breathe-glow 4s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes kinilis-breathe-glow {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  100% { transform: scale(1.15); opacity: 0.95; }
+}
+
+/* Single Thin Elegant Ring (Gold & Emerald) */
+.kinilis-minimal-accent-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+  animation: kinilis-spin-slow 18s linear infinite;
+  pointer-events: none;
+}
+
+.kinilis-ring-photon {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow: 0 0 10px 2px #f59e0b;
+}
+
+@keyframes kinilis-spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 3D Floating Official Seal */
+.kinilis-seal-img-box {
+  width: 170px;
+  height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: kinilis-float-clean 4.5s ease-in-out infinite;
+}
+
+@media (min-width: 640px) {
+  .kinilis-seal-img-box {
+    width: 200px;
+    height: 200px;
+  }
+}
+
+.kinilis-seal-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: 
+    drop-shadow(0 16px 24px rgba(0, 0, 0, 0.8))
+    drop-shadow(0 0 16px rgba(52, 211, 153, 0.3));
+}
+
+/* Elevation Shadow beneath the seal */
+.kinilis-seal-base-shadow {
+  position: absolute;
+  bottom: -16px;
+  width: 140px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.85) 0%, transparent 70%);
+  filter: blur(8px);
+  animation: kinilis-shadow-clean 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes kinilis-float-clean {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-10px) scale(1.02); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+@keyframes kinilis-shadow-clean {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(0.85); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 0.8; }
+}
+
+/* Typography Hierarchy */
+.kinilis-title-main {
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.85);
+}
+
+.kinilis-title-portal {
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+/* Minimal Circular Spinner (DesinioKoleksyon Style) */
+.kinilis-minimal-spinner {
+  width: 38px;
+  height: 38px;
+}
+
+.kinilis-spinner-track {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgba(52, 211, 153, 0.18);
+  border-top-color: #34d399;
+  border-right-color: #fbbf24;
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.35);
+  animation: kinilis-spinner-spin 1.2s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+.kinilis-spinner-center-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow: 0 0 6px #f59e0b;
+}
+
+@keyframes kinilis-spinner-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Reduced Motion Mode */
+@media (prefers-reduced-motion: reduce) {
+  .kinilis-minimal-accent-ring,
+  .kinilis-seal-img-box,
+  .kinilis-seal-base-shadow,
+  .kinilis-seal-soft-radial,
+  .kinilis-spinner-track {
+    animation: none !important;
+  }
+
+  .kinilis-minimal-preloader {
+    transition: opacity 0.2s ease;
+  }
+}

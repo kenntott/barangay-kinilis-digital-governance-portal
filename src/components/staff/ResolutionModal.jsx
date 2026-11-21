@@ -10,6 +10,7 @@ export const ResolutionModal = ({ complaint, onClose }) => {
   const [summary, setSummary] = useState('');
   const [evidenceFile, setEvidenceFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   if (!complaint) return null;
 
@@ -18,6 +19,7 @@ export const ResolutionModal = ({ complaint, onClose }) => {
     if (!summary.trim()) return;
 
     setIsSubmitting(true);
+    setSubmitError('');
     try {
       await resolveComplaint(
         complaint.id,
@@ -29,6 +31,7 @@ export const ResolutionModal = ({ complaint, onClose }) => {
       onClose();
     } catch (err) {
       console.error('Failed to submit resolution:', err);
+      setSubmitError(err.message || 'Failed to submit resolution. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -63,6 +66,12 @@ export const ResolutionModal = ({ complaint, onClose }) => {
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto overscroll-contain flex-1">
+          {submitError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold">
+              {submitError}
+            </div>
+          )}
+
           <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
             <span className="text-[10px] text-slate-400 font-bold uppercase">Incident</span>
             <p className="font-bold text-slate-800 text-xs mt-0.5">{complaint.title}</p>

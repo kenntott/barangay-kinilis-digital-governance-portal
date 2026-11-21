@@ -6,6 +6,7 @@ import { StaffAssignedMasterlist } from '../components/staff/StaffAssignedMaster
 import { StaffAIReviewDesk } from '../components/staff/StaffAIReviewDesk';
 import { StaffNotificationsCenter } from '../components/staff/StaffNotificationsCenter';
 import { StaffReportsAnalytics } from '../components/staff/StaffReportsAnalytics';
+import { FeedbackManagement } from '../components/admin/FeedbackManagement';
 import { AssignedComplaints } from '../pages/staff/complaints/AssignedComplaints';
 import { StaffProfile } from '../pages/staff/profile/StaffProfile';
 import { SettingsPage } from '../components/shared/SettingsPage';
@@ -24,6 +25,8 @@ export const StaffRoutes = ({
         return <StaffDashboard onViewDetails={onViewDetails} onOpenAIReview={onOpenAIReview} />;
       case 'complaint-management':
         return <StaffAssignedMasterlist onViewDetails={onViewDetails} onOpenAIReview={onOpenAIReview} />;
+      case 'feedback':
+        return <FeedbackManagement onViewDetails={onViewDetails} />;
       case 'ai-review':
         return <StaffAIReviewDesk onNavigate={(tab) => setActiveTab(tab)} onOpenAIReview={onOpenAIReview} />;
       case 'notifications':

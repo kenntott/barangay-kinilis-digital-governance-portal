@@ -1,24 +1,49 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useComplaints } from '../../context/ComplaintContext';
-import { Building2, User, X, Check, ShieldAlert } from 'lucide-react';
+import { Building2, User, X, Check, ShieldAlert, AlertTriangle, UserCheck } from 'lucide-react';
 
 export const AssignmentModal = ({ complaint, onClose }) => {
   const { user } = useAuth();
   const { departments, staffList, reassignComplaint } = useComplaints();
 
-  const [selectedDept, setSelectedDept] = useState(complaint?.routing?.department || 'Sanitation Department');
+  // Filter to active departments only
+  const activeDepartments = departments.filter(d => (d.status || 'Active') === 'Active');
+
+  // Determine initial department ensuring it's an active department if possible
+  const initialDept = complaint?.routing?.department && activeDepartments.some(d => d.name === complaint.routing.department)
+    ? complaint.routing.department
+    : (activeDepartments[0]?.name || complaint?.routing?.department || 'Barangay Administrative Office');
+
+  const [selectedDept, setSelectedDept] = useState(initialDept);
   const [selectedOfficer, setSelectedOfficer] = useState(complaint?.routing?.assignedStaff || '');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   if (!complaint) return null;
 
-  // Filter staff by department
-  const availableStaff = staffList.filter(s => s.department === selectedDept || !s.department);
+  // Enforce staff eligibility: must belong to the selected department AND be Active
+  const eligibleStaff = staffList.filter(s => 
+    s.department === selectedDept && (s.status || 'Active') === 'Active'
+  );
+
+  // Check if currently assigned officer is inactive or from different department
+  const currentOfficerProfile = staffList.find(s => s.name === complaint?.routing?.assignedStaff);
+  const isCurrentOfficerInvalid = currentOfficerProfile && (
+    currentOfficerProfile.status === 'Inactive' || 
+    (currentOfficerProfile.department && currentOfficerProfile.department !== selectedDept)
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
+
+    if (!selectedDept) {
+      setErrorMessage('Please select an active department.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await reassignComplaint(
@@ -31,6 +56,7 @@ export const AssignmentModal = ({ complaint, onClose }) => {
       onClose();
     } catch (err) {
       console.error('Failed to reassign:', err);
+      setErrorMessage(err.message || 'Failed to update assignment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -65,6 +91,20 @@ export const AssignmentModal = ({ complaint, onClose }) => {
 
         {/* Content Form */}
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto overscroll-contain flex-1">
+          {errorMessage && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {isCurrentOfficerInvalid && (
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-medium flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>Current officer ({complaint?.routing?.assignedStaff}) is inactive or transferred. Please assign an active officer.</span>
+            </div>
+          )}
+
           <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
             <span className="text-[10px] text-slate-400 font-bold uppercase">Complaint Title</span>
             <p className="font-bold text-slate-800 text-xs mt-0.5">{complaint.title}</p>
@@ -83,27 +123,42 @@ export const AssignmentModal = ({ complaint, onClose }) => {
               }}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-semibold bg-white text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
             >
-              {departments.map(d => (
-                <option key={d.id} value={d.name}>{d.name}</option>
-              ))}
+              {activeDepartments.length > 0 ? (
+                activeDepartments.map(d => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
+                ))
+              ) : (
+                departments.map(d => (
+                  <option key={d.id} value={d.name}>{d.name} ({d.status || 'Active'})</option>
+                ))
+              )}
             </select>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Assigned Officer / Staff Member
+              Assigned Officer / Staff Member <span className="text-slate-400 font-normal">(Active personnel only)</span>
             </label>
             <select
               value={selectedOfficer}
               onChange={(e) => setSelectedOfficer(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-semibold bg-white text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
             >
-              <option value="">Select Officer or Desk</option>
-              {availableStaff.map(s => (
-                <option key={s.id} value={s.name}>{s.name} ({s.position || s.role})</option>
+              <option value="">Select Eligible Active Officer</option>
+              {eligibleStaff.map(s => (
+                <option key={s.id} value={s.name}>
+                  {s.name} ({s.position || s.role || 'Staff'})
+                </option>
               ))}
-              <option value="Department Desk Officer">Department Desk Officer</option>
+              <option value="Department Desk Officer">Department Desk Officer (Default)</option>
             </select>
+
+            {eligibleStaff.length === 0 && (
+              <p className="mt-1.5 text-[11px] text-amber-700 font-medium flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                No active personnel currently assigned to {selectedDept}. Assignment will route to Department Desk Officer.
+              </p>
+            )}
           </div>
 
           <div>
@@ -133,7 +188,7 @@ export const AssignmentModal = ({ complaint, onClose }) => {
               className="px-5 py-2.5 min-h-[44px] rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs shadow-md flex items-center gap-1.5 touch-manipulation cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>{isSubmitting ? 'Saving...' : 'Confirm Assignment'}</span>
+              <span>{isSubmitting ? 'Saving Assignment...' : 'Confirm Assignment'}</span>
             </button>
           </div>
         </form>

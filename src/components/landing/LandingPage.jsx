@@ -11,6 +11,7 @@ import {
   Info, Compass, HelpCircle, PhoneCall, ShieldCheck, Loader2
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from '../common/StatusBadge';
+import { trackPublicComplaint } from '../../lib/supabaseService';
 
 export const LandingPage = ({ onNavigate, onOpenAuth }) => {
   const { user, isAuthenticated } = useAuth();
@@ -21,6 +22,7 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
   const [trackResult, setTrackResult] = useState(null);
   const [searched, setSearched] = useState(false);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
+  const [trackError, setTrackError] = useState(null);
 
   // Gallery Lightbox modal state
   const [selectedGalleryImage, setSelectedGalleryImage] = useState(null);
@@ -70,22 +72,77 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
     }
   };
 
-  const handleSearchTrack = (e) => {
+  const handleSearchTrack = async (e) => {
     e.preventDefault();
-    const query = trackInput.trim().toLowerCase();
+    const query = trackInput.trim().toUpperCase();
     if (!query) {
       setSearched(true);
       setTrackResult(null);
+      setTrackError('Please enter a complaint reference number.');
       return;
     }
+
     setIsTrackingLoading(true);
     setSearched(true);
+    setTrackError(null);
 
-    setTimeout(() => {
-      const found = complaints.find(c => c.referenceNo.toLowerCase() === query);
-      setTrackResult(found || null);
+    try {
+      // 1. Live Supabase database lookup (enforces zero PII return)
+      const result = await trackPublicComplaint(query);
+      if (result) {
+        setTrackResult(result);
+        setTrackError(null);
+      } else {
+        // Fallback check against in-memory cached state if offline/unconnected
+        const localFound = complaints.find(c => c.referenceNo.toUpperCase() === query);
+        if (localFound) {
+          setTrackResult({
+            referenceNo: localFound.referenceNo,
+            title: localFound.title,
+            category: localFound.category,
+            status: localFound.status,
+            priority: localFound.priority,
+            department: localFound.routing?.department || 'Assigned Department',
+            incidentDate: localFound.incidentDate || 'Recent',
+            timeline: (localFound.timeline || []).map(t => ({
+              status: t.status,
+              date: t.date,
+              desc: t.desc
+            }))
+          });
+          setTrackError(null);
+        } else {
+          setTrackResult(null);
+          setTrackError(null);
+        }
+      }
+    } catch (err) {
+      console.warn('[handleSearchTrack] Supabase tracking notice:', err.message);
+      // Fallback to memory complaints
+      const localFound = complaints.find(c => c.referenceNo.toUpperCase() === query);
+      if (localFound) {
+        setTrackResult({
+          referenceNo: localFound.referenceNo,
+          title: localFound.title,
+          category: localFound.category,
+          status: localFound.status,
+          priority: localFound.priority,
+          department: localFound.routing?.department || 'Assigned Department',
+          incidentDate: localFound.incidentDate || 'Recent',
+          timeline: (localFound.timeline || []).map(t => ({
+            status: t.status,
+            date: t.date,
+            desc: t.desc
+          }))
+        });
+        setTrackError(null);
+      } else {
+        setTrackResult(null);
+        setTrackError(err.message || 'Unable to track complaint at this time.');
+      }
+    } finally {
       setIsTrackingLoading(false);
-    }, 350);
+    }
   };
 
   // Section 6: Six Public Community Services
@@ -624,7 +681,9 @@ export const LandingPage = ({ onNavigate, onOpenAuth }) => {
                       <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
                         <AlertTriangle className="w-4 h-4" />
                       </div>
-                      <p className="text-rose-600 font-black text-xs">No complaint found for "{trackInput}"</p>
+                      <p className="text-rose-600 font-black text-xs">
+                        {trackError || `No complaint found for "${trackInput}"`}
+                      </p>
                       <p className="text-slate-500 text-[11px] leading-relaxed">
                         Please verify your reference number. Example: <code className="bg-slate-200/80 px-1.5 py-0.5 rounded font-mono text-[10px] font-bold">KIN-2026-000123</code>
                       </p>

@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   Home, PlusCircle, ClipboardList, LayoutDashboard, Building2, 
   Users, Sliders, BarChart3, FileText, Bell, Settings, User, Compass,
-  ChevronRight, Bot, PanelLeftClose, PanelLeftOpen, Sparkles, ShieldCheck, X
+  ChevronRight, Bot, PanelLeftClose, PanelLeftOpen, Sparkles, ShieldCheck, X, MessageSquare
 } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
@@ -167,6 +167,7 @@ export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
               {renderNavSection('Operational Command', [
                 { id: 'staff-dashboard', label: 'Staff Command Desk', icon: LayoutDashboard },
                 { id: 'complaint-management', label: 'Assigned Complaints', icon: ClipboardList },
+                { id: 'feedback', label: 'Resident Feedback', icon: MessageSquare },
                 { id: 'ai-review', label: 'AI Review & Override', icon: Bot, highlight: true, badge: 'AUTO' },
                 { id: 'notifications', label: 'Notifications', icon: Bell }
               ])}
@@ -192,6 +193,7 @@ export const Sidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
                 { id: 'staff-management', label: 'Staff Directory', icon: Users }
               ])}
               {renderNavSection('REPORTING', [
+                { id: 'feedback', label: 'Resident Feedback & Inquiries', icon: MessageSquare },
                 { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
                 { id: 'audit-logs', label: 'Audit Trail Log', icon: FileText }
               ])}

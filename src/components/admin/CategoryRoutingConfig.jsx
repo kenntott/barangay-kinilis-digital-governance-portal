@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useComplaints } from '../../context/ComplaintContext';
 import { 
   Sliders, Save, Plus, Trash2, Bot, GitMerge, CheckCircle2, ArrowRight, 
-  Sparkles, Layers, ShieldCheck, Tag, RefreshCw, ChevronRight, HelpCircle, Check, AlertTriangle
+  Sparkles, Layers, ShieldCheck, Tag, RefreshCw, ChevronRight, HelpCircle, Check, AlertTriangle, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { AdminPageHeader } from '../common/AdminPageHeader';
 
@@ -10,33 +10,65 @@ export const CategoryRoutingConfig = () => {
   const { categoryRoutingRules, updateRoutingRules, departments, complaints, updateComplaint } = useComplaints();
   const [rules, setRules] = useState(categoryRoutingRules);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('pipeline'); // 'pipeline' or 'rules'
+
+  // Synchronize state when backend rules load
+  useEffect(() => {
+    if (Array.isArray(categoryRoutingRules) && categoryRoutingRules.length > 0) {
+      setRules(categoryRoutingRules);
+    }
+  }, [categoryRoutingRules]);
 
   // Filter pending complaints that need AI review or confirmation
   const pendingAiComplaints = complaints.filter(c => c.status === 'Pending' || c.aiResult?.confidence < 85);
 
   const handleRuleChange = (index, field, value) => {
     const updated = [...rules];
-    updated[index][field] = value;
+    updated[index] = {
+      ...updated[index],
+      [field]: value
+    };
     setRules(updated);
   };
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    updateRoutingRules(rules);
-    setSavedMsg(true);
-    setTimeout(() => setSavedMsg(false), 3000);
+  const handleToggleRuleStatus = (index) => {
+    const updated = [...rules];
+    const current = updated[index].isActive !== false;
+    updated[index] = {
+      ...updated[index],
+      isActive: !current
+    };
+    setRules(updated);
+  };
+
+  const handleSave = async (e) => {
+    if (e) e.preventDefault();
+    setIsSaving(true);
+    setErrorMsg(null);
+    try {
+      await updateRoutingRules(rules);
+      setSavedMsg(true);
+      setTimeout(() => setSavedMsg(false), 3500);
+    } catch (err) {
+      console.error('Failed to update routing rules:', err);
+      setErrorMsg(err.message || 'Failed to update routing rules.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddRule = () => {
     setRules(prev => [
       ...prev,
       {
-        category: 'Environmental Concern',
-        department: departments[0]?.name || 'Sanitation Department',
+        category: `Custom Category ${prev.length + 1}`,
+        department: departments[0]?.name || 'Barangay Administrative Office',
         defaultPriority: 'Medium',
-        keywords: ['river', 'trees', 'pollution', 'smoke'],
-        assignedStaff: 'Environmental Desk'
+        keywords: ['issue', 'concern'],
+        assignedStaff: 'Department Desk Officer',
+        isActive: true
       }
     ]);
   };
@@ -58,15 +90,16 @@ export const CategoryRoutingConfig = () => {
       <button
         type="button"
         onClick={handleAddRule}
-        className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center gap-1.5 border border-slate-200"
+        className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center gap-1.5 border border-slate-200 cursor-pointer"
       >
         <Plus className="w-4 h-4" /> Add Mapping Rule
       </button>
       <button
         onClick={handleSave}
-        className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5"
+        disabled={isSaving}
+        className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
       >
-        <Save className="w-4 h-4" /> Save Rule Engine
+        <Save className="w-4 h-4" /> {isSaving ? 'Saving Engine...' : 'Save Rule Engine'}
       </button>
     </div>
   );
@@ -83,7 +116,13 @@ export const CategoryRoutingConfig = () => {
 
       {savedMsg && (
         <div className="p-4 rounded-2xl bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-xs">
-          <CheckCircle2 className="w-4 h-4 text-emerald-700" /> Dynamic AI Category & Department Mapping Rules updated successfully!
+          <CheckCircle2 className="w-4 h-4 text-emerald-700" /> Dynamic AI Category & Department Mapping Rules updated successfully in Supabase!
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2 shadow-xs">
+          <AlertTriangle className="w-4 h-4 text-rose-600" /> {errorMsg}
         </div>
       )}
 
@@ -221,12 +260,12 @@ export const CategoryRoutingConfig = () => {
             <p className="text-xs text-slate-500">Edit triggers to immediately update system-wide routing behavior</p>
           </div>
           <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-            {rules.length} Rules Active
+            {rules.filter(r => r.isActive !== false).length} of {rules.length} Rules Active
           </span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+          <table className="w-full text-left text-xs border-collapse min-w-[760px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider">
                 <th className="py-3 px-4">Complaint Category</th>
@@ -234,12 +273,13 @@ export const CategoryRoutingConfig = () => {
                 <th className="py-3 px-4">Default Priority</th>
                 <th className="py-3 px-4">Assigned Default Staff</th>
                 <th className="py-3 px-4">Trigger Keywords</th>
+                <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rules.map((rule, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${rule.isActive === false ? 'opacity-60 bg-slate-50/50' : ''}`}>
                   <td className="py-3.5 px-4 font-extrabold text-slate-900">
                     <input
                       type="text"
@@ -256,7 +296,7 @@ export const CategoryRoutingConfig = () => {
                       className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-semibold text-xs bg-white"
                     >
                       {departments.map(d => (
-                        <option key={d.id} value={d.name}>{d.name}</option>
+                        <option key={d.id} value={d.name}>{d.name} {d.status === 'Inactive' ? '(Inactive)' : ''}</option>
                       ))}
                     </select>
                   </td>
@@ -277,26 +317,43 @@ export const CategoryRoutingConfig = () => {
                   <td className="py-3.5 px-4">
                     <input
                       type="text"
-                      value={rule.assignedStaff}
+                      value={rule.assignedStaff || ''}
                       onChange={(e) => handleRuleChange(idx, 'assignedStaff', e.target.value)}
                       className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 font-medium text-xs"
+                      placeholder="Department Desk Officer"
                     />
                   </td>
 
                   <td className="py-3.5 px-4">
                     <input
                       type="text"
-                      value={rule.keywords.join(', ')}
+                      value={Array.isArray(rule.keywords) ? rule.keywords.join(', ') : (rule.keywords || '')}
                       onChange={(e) => handleRuleChange(idx, 'keywords', e.target.value.split(',').map(s => s.trim()))}
                       className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-mono"
+                      placeholder="comma, separated, keywords"
                     />
+                  </td>
+
+                  <td className="py-3.5 px-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleRuleStatus(idx)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-colors ${
+                        rule.isActive !== false 
+                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' 
+                          : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                      }`}
+                    >
+                      {rule.isActive !== false ? 'Active' : 'Inactive'}
+                    </button>
                   </td>
 
                   <td className="py-3.5 px-4 text-right">
                     <button
+                      type="button"
                       onClick={() => handleRemoveRule(idx)}
                       title="Delete Rule"
-                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                      className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

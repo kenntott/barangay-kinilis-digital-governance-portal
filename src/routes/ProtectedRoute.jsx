@@ -22,6 +22,23 @@ export const ProtectedRoute = ({ children, requiredRole, onNavigate, onOpenAuth 
     );
   }
 
+  if (!user?.status || user.status.trim().toLowerCase() !== 'active') {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white text-center">
+        <div className="max-w-md bg-slate-800 p-8 rounded-3xl border border-rose-500/30 space-y-4 shadow-2xl">
+          <h2 className="text-xl font-black text-rose-400">Account Inactive or Suspended</h2>
+          <p className="text-xs text-slate-300">Your account is currently deactivated or suspended. You cannot access this portal.</p>
+          <button
+            onClick={() => onOpenAuth && onOpenAuth('login')}
+            className="w-full py-3 px-5 rounded-2xl bg-slate-700 hover:bg-slate-600 text-white font-extrabold text-xs shadow-md"
+          >
+            Back to Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (requiredRole && user.role !== requiredRole) {
     return <Unauthorized onNavigate={onNavigate} />;
   }

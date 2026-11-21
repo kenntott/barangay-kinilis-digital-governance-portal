@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 export const AuthModal = ({ isOpen, onClose, initialMode = 'login', onSuccessRedirect }) => {
-  const { login, register } = useAuth();
+  const { login, register, triggerPreloader } = useAuth();
   
   const [mode, setMode] = useState(initialMode); // 'login' or 'register'
   const [email, setEmail] = useState('');
@@ -39,7 +39,10 @@ export const AuthModal = ({ isOpen, onClose, initialMode = 'login', onSuccessRed
       setLoading(false);
       if (res && res.success) {
         onClose();
-        if (onSuccessRedirect) onSuccessRedirect(res.user.role);
+        // Trigger cinematic 3D seal login animation
+        triggerPreloader('login', res.user.role, res.user.name, () => {
+          if (onSuccessRedirect) onSuccessRedirect(res.user.role);
+        });
       } else {
         setError(res?.error || 'Invalid credentials or authentication error.');
       }
@@ -59,7 +62,9 @@ export const AuthModal = ({ isOpen, onClose, initialMode = 'login', onSuccessRed
       setLoading(false);
       if (res && res.success) {
         onClose();
-        if (onSuccessRedirect) onSuccessRedirect('resident');
+        triggerPreloader('login', 'resident', res.user.name, () => {
+          if (onSuccessRedirect) onSuccessRedirect('resident');
+        });
       } else {
         setError(res?.error || 'Registration failed. Please try again.');
       }

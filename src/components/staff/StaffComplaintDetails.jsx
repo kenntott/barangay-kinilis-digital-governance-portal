@@ -4,19 +4,22 @@ import { useComplaints } from '../../context/ComplaintContext';
 import { StatusBadge, PriorityBadge } from '../common/StatusBadge';
 import { 
   ArrowLeft, Bot, GitMerge, CheckCircle2, AlertCircle, 
-  MapPin, User, Calendar, Phone, Mail, Upload, Save, Sparkles, Send, MessageSquare, Clock
+  MapPin, User, Calendar, Phone, Mail, Upload, Save, Sparkles, Send, MessageSquare, Clock, Star, Paperclip
 } from 'lucide-react';
 import apiClient from '../../services/api/apiClient';
+import { fetchComplaintFollowupsFromSupabase, getFollowupAttachmentUrl } from '../../lib/supabaseService';
+import { isSupabaseConfigured } from '../../lib/supabase';
 
 export const StaffComplaintDetails = ({ complaint, onBack, onOpenAIReview }) => {
   const { user } = useAuth();
-  const { updateComplaintStatus, resolveComplaint, sendFollowup } = useComplaints();
+  const { updateComplaintStatus, resolveComplaint, sendFollowup, feedbackList = [] } = useComplaints();
 
   const [status, setStatus] = useState(complaint?.status || 'Submitted');
   const [remarks, setRemarks] = useState(complaint?.remarks || '');
   const [resolutionSummary, setResolutionSummary] = useState(complaint?.resolution?.summary || '');
   const [resolutionFile, setResolutionFile] = useState(null);
   const [savedSuccess, setSavedSuccess] = useState('');
+  const [resolutionError, setResolutionError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Follow-up thread state (Feature 7)
@@ -25,13 +28,27 @@ export const StaffComplaintDetails = ({ complaint, onBack, onOpenAIReview }) => 
   const [isSendingReply, setIsSendingReply] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     if (complaint?.id) {
-      apiClient.get('followups.php', { complaint_id: complaint.id })
-        .then(data => {
-          if (Array.isArray(data)) setFollowups(data);
-        })
-        .catch(() => {});
+      if (isSupabaseConfigured()) {
+        fetchComplaintFollowupsFromSupabase(complaint.id)
+          .then(data => {
+            if (isMounted && Array.isArray(data)) setFollowups(data);
+          })
+          .catch(err => {
+            console.warn('[StaffComplaintDetails] Supabase followups notice:', err);
+          });
+      } else {
+        apiClient.get('followups.php', { complaint_id: complaint.id })
+          .then(data => {
+            if (isMounted && Array.isArray(data)) setFollowups(data);
+          })
+          .catch(() => {});
+      }
     }
+    return () => {
+      isMounted = false;
+    };
   }, [complaint?.id]);
 
   if (!complaint) return null;
@@ -83,13 +100,15 @@ export const StaffComplaintDetails = ({ complaint, onBack, onOpenAIReview }) => 
     if (!resolutionSummary.trim()) return;
 
     setIsSubmitting(true);
+    setResolutionError('');
     try {
       await resolveComplaint(complaint.id, resolutionSummary, '', user, resolutionFile);
       setStatus('Resolution Submitted');
       setSavedSuccess('Resolution submitted! Awaiting resident verification.');
       setTimeout(() => setSavedSuccess(''), 4000);
     } catch (err) {
-      console.error(err);
+      console.error('[StaffComplaintDetails] Resolution error:', err);
+      setResolutionError(err.message || 'Failed to submit resolution. Please verify assignment and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -252,6 +271,18 @@ export const StaffComplaintDetails = ({ complaint, onBack, onOpenAIReview }) => 
                       <span className="text-[10px] text-slate-400 font-normal">{msg.date}</span>
                     </div>
                     <p className="text-slate-700 leading-relaxed">{msg.message}</p>
+                    {(msg.attachmentPath || msg.attachment_path) && (
+                      <div className="mt-2 pt-2 border-t border-slate-200/60">
+                        <a
+                          href={msg.attachmentUrl || msg.attachmentPath || msg.attachment_path}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100/80 hover:bg-emerald-200 text-emerald-800 text-[11px] font-bold transition-colors"
+                        >
+                          <Paperclip className="w-3.5 h-3.5" /> View Attached File
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -277,6 +308,61 @@ export const StaffComplaintDetails = ({ complaint, onBack, onOpenAIReview }) => 
             </form>
           </div>
 
+          {/* Resident Feedback & Satisfaction Card (Phase 4) */}
+          {(() => {
+            const residentFeedback = feedbackList?.find(f =>
+              String(f.complaintId) === String(complaint?.id) ||
+              String(f.referenceNo) === String(complaint?.referenceNo)
+            ) || complaint?.feedback;
+
+            if (!residentFeedback) return null;
+
+            return (
+              <div className="bg-gradient-to-br from-amber-50 to-emerald-50 rounded-3xl border border-amber-200/80 p-6 shadow-xs space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                  <span className="font-extrabold text-sm text-amber-900 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> Resident Resolution Feedback
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                    {residentFeedback.actionStatus || 'Accepted'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`w-4 h-4 ${
+                          star <= (residentFeedback.rating || 0)
+                            ? 'text-amber-500 fill-amber-500'
+                            : 'text-slate-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="font-black text-slate-900 text-sm">
+                    {residentFeedback.rating ? `${residentFeedback.rating} / 5` : 'No rating'}
+                  </span>
+                  {residentFeedback.satisfactionLevel && (
+                    <span className="text-slate-600 font-semibold text-xs">
+                      • {residentFeedback.satisfactionLevel}
+                    </span>
+                  )}
+                </div>
+                {residentFeedback.comments && (
+                  <div className="p-3 bg-white/80 rounded-xl border border-amber-200/50 text-slate-800 leading-relaxed italic">
+                    "{residentFeedback.comments}"
+                  </div>
+                )}
+                {residentFeedback.submittedAt && (
+                  <p className="text-[10px] text-slate-400">
+                    Submitted on {new Date(residentFeedback.submittedAt).toLocaleDateString()} at {new Date(residentFeedback.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
           {/* FEATURE 8: Staff Resolution Submission */}
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-4 text-xs">
             <h2 className="font-extrabold text-slate-900 text-sm border-b border-slate-100 pb-2">
@@ -284,6 +370,13 @@ export const StaffComplaintDetails = ({ complaint, onBack, onOpenAIReview }) => 
             </h2>
 
             <form onSubmit={handleResolveSubmit} className="space-y-4">
+              {resolutionError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{resolutionError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Actions Taken & Resolution Summary <span className="text-rose-500">*</span>

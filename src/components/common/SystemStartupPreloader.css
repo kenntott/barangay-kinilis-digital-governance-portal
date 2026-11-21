@@ -1,0 +1,204 @@
+﻿/* =========================================================================
+   SystemStartupPreloader.css — Dedicated Percentage-Based Startup Theme
+   Matches user mockup with deep emerald, charcoal, glowing photon bar, and steps
+   ========================================================================= */
+
+.kinilis-startup-preloader {
+  background-color: #04120D;
+  background-image: 
+    radial-gradient(ellipse at 50% 30%, rgba(7, 91, 66, 0.45) 0%, rgba(4, 18, 13, 0.95) 75%),
+    linear-gradient(180deg, #020b08 0%, #061e16 50%, #030d09 100%);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kinilis-startup-fadeout {
+  opacity: 0;
+  transform: scale(1.02);
+  pointer-events: none;
+}
+
+/* Background Atmospheric Radial Glow */
+.kinilis-startup-backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(11, 143, 101, 0.15) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.kinilis-startup-radial-glow {
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(232, 184, 68, 0.08) 0%, rgba(7, 91, 66, 0.2) 40%, transparent 70%);
+  filter: blur(50px);
+  pointer-events: none;
+}
+
+/* Geometric Corner Accents */
+.kinilis-startup-corner {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+.corner-tl { top: 24px; left: 24px; }
+.corner-tr { top: 24px; right: 24px; }
+.corner-bl { bottom: 24px; left: 24px; }
+.corner-br { bottom: 24px; right: 24px; }
+
+.kinilis-startup-matrix {
+  display: grid;
+  grid-template-columns: repeat(5, 4px);
+  gap: 8px;
+}
+
+.startup-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: #E8B844;
+  opacity: 0.6;
+}
+
+.kinilis-startup-diagonal {
+  width: 55px;
+  height: 55px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(232, 184, 68, 0.5) 0,
+    rgba(232, 184, 68, 0.5) 2px,
+    transparent 2px,
+    transparent 10px
+  );
+}
+
+.kinilis-startup-diagonal.flip {
+  transform: scaleX(-1);
+}
+
+/* 3D Official Seal Styling */
+.kinilis-startup-seal-wrapper {
+  width: 170px;
+  height: 170px;
+}
+
+@media (min-width: 640px) {
+  .kinilis-startup-seal-wrapper {
+    width: 210px;
+    height: 210px;
+  }
+}
+
+.kinilis-startup-seal-glow {
+  position: absolute;
+  inset: -15px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, rgba(232, 184, 68, 0.15) 50%, transparent 70%);
+  filter: blur(16px);
+  animation: startupPulse 4s ease-in-out infinite alternate;
+}
+
+/* Rotating Halo Ring */
+.kinilis-startup-seal-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(232, 184, 68, 0.45);
+  box-shadow: 0 0 15px rgba(232, 184, 68, 0.25), inset 0 0 15px rgba(7, 91, 66, 0.4);
+  animation: startupRotateRing 14s linear infinite;
+}
+
+.startup-ring-photon {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background-color: #FFF;
+  box-shadow: 0 0 12px 3px rgba(232, 184, 68, 1), 0 0 20px 6px rgba(16, 185, 129, 0.8);
+}
+
+.kinilis-startup-seal-shadow {
+  position: absolute;
+  bottom: -15px;
+  width: 75%;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  filter: blur(8px);
+}
+
+.kinilis-startup-seal-box {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: startupFloat 5s ease-in-out infinite;
+}
+
+.kinilis-startup-seal-img {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.65));
+}
+
+/* Typography Enhancements */
+.kinilis-startup-title {
+  text-shadow: 0 2px 15px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.3);
+}
+
+.kinilis-startup-subtitle {
+  text-shadow: 0 0 15px rgba(232, 184, 68, 0.4);
+}
+
+/* Horizontal Progress Bar Photon Animation */
+.startup-progress-photon {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 25px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9));
+  box-shadow: 0 0 10px #FFF, 0 0 20px #E8B844;
+  border-radius: 9999px;
+  animation: photonFlicker 1.5s ease-in-out infinite alternate;
+}
+
+/* Keyframe Animations */
+@keyframes startupRotateRing {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes startupFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes startupPulse {
+  0% { transform: scale(0.95); opacity: 0.6; }
+  100% { transform: scale(1.05); opacity: 0.9; }
+}
+
+@keyframes photonFlicker {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .kinilis-startup-seal-ring,
+  .kinilis-startup-seal-glow,
+  .kinilis-startup-seal-box,
+  .startup-progress-photon {
+    animation: none !important;
+  }
+}
